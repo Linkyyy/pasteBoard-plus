@@ -1,0 +1,84 @@
+{
+  "name": "pasteboard-plus",
+  "productName": "PasteBoard Plus",
+  "version": "0.1.1",
+  "description": "A thoughtful clipboard companion with collections and AI translation.",
+  "author": "PasteBoard Plus",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --host 0.0.0.0",
+    "build": "npm run typecheck && vite build && node scripts/build-electron.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:desktop": "node scripts/smoke-desktop.mjs",
+    "test:desktop:headless": "node scripts/with-display.mjs -- npm run test:desktop",
+    "start": "electron .",
+    "start:cloud": "node scripts/with-display.mjs -- npx --no electron . --no-sandbox",
+    "pack": "npm run build && electron-builder --dir",
+    "dist:win": "npm run build && electron-builder --win nsis zip --x64"
+  },
+  "dependencies": {
+    "lucide-react": "1.68.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "undici": "8.12.3",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.6",
+    "vitest": "5.1.0"
+  },
+  "build": {
+    "appId": "com.pasteboard.plus",
+    "productName": "PasteBoard Plus",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "compression": "maximum",
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "PasteBoard-Plus-${version}-win-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "PasteBoard Plus",
+      "artifactName": "PasteBoard-Plus-Setup-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": "dir",
+      "category": "Utility",
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity"
+    }
+  }
+}
