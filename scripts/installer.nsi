@@ -12,8 +12,7 @@ Name "PasteBoard Plus"
 InstallDir "$LOCALAPPDATA\Programs\PasteBoard Plus"
 InstallDirRegKey HKCU "Software\PasteBoardPlus" "InstallLocation"
 RequestExecutionLevel user
-SetCompressor /SOLID lzma
-SetCompressorDictSize 16
+SetCompressor zlib
 CRCCheck on
 ShowInstDetails show
 ShowUninstDetails show

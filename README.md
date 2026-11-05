@@ -2,6 +2,14 @@
 
 给每一次复制，一个好去处。一个类似 Windows + V 的桌面剪贴板，基于 Electron、React 和 TypeScript，主要面向 Windows，也可在 macOS / Linux 上开发运行。
 
+## 下载 v0.1.1
+
+- [Windows x64 安装程序](installers/PasteBoard-Plus-Setup-0.1.1-x64.exe?raw=true)：双击安装，可选择安装位置。
+- [Windows x64 便携 ZIP](installers/PasteBoard-Plus-0.1.1-win-x64.zip?raw=true)：完整解压后运行 `PasteBoard Plus.exe`。
+- [SHA-256 校验文件](installers/SHA256SUMS.txt)。安装包通过 Git LFS 存储；直接点击上述链接下载即可。克隆时如需同时获取二进制文件，请安装 Git LFS。
+
+此版本已将界面边框改为柔和阴影，并取消图片文件大小和像素数量上限。安装包未签名，Windows 原生运行仍需实机验证。
+
 ## 已实现
 
 - **自动历史**：每 800 ms 检查系统剪贴板，记录文字和图片，去重并保存到本机；退出、重启后恢复。
@@ -94,6 +102,8 @@ npm run test:desktop:headless
 ```
 
 当前云环境自带 Chromium、GTK 和 Xorg dummy，无需 Docker 或外部数据库。`scripts/with-display.mjs` 只启动自己的虚拟显示器，并在子进程退出后清理。对于不支持 Chromium 沙箱的隔离云容器，`npm run start:cloud` 使用测试用 `--no-sandbox` 启动；正常桌面用户请使用 `npm start`。
+
+在 Linux 云环境生成 Windows 安装程序时，运行 `NODE_USE_ENV_PROXY=1 npm run dist:win`。安装程序使用标准 NSIS 脚本，在安装时生成卸载程序，构建时无需 Wine。支持选择安装位置、创建桌面 / 开始菜单快捷方式，并注册 Windows 卸载入口；卸载时保留独立的剪贴板历史目录。
 
 ## 目录
 

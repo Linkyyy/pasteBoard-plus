@@ -1,0 +1,2 @@
+45523bfc28f7ec1eb111c7b563c0999119b496c28eb5ef39aa9d73f7820cde42  PasteBoard-Plus-Setup-0.1.1-x64.exe
+05c87d55610205501e0e2481a6dff555f69b8e1cd740c1249eeb84ee61358430  PasteBoard-Plus-0.1.1-win-x64.zip
