@@ -20,7 +20,7 @@
     "start": "electron .",
     "start:cloud": "node scripts/with-display.mjs -- npx --no electron . --no-sandbox",
     "pack": "npm run build && electron-builder --dir",
-    "dist:win": "npm run build && electron-builder --win nsis zip --x64"
+    "dist:win": "npm run build && electron-builder --win nsis --x64 && electron-builder --win zip --x64 --prepackaged release/win-unpacked"
   },
   "dependencies": {
     "lucide-react": "1.68.0",
@@ -55,7 +55,6 @@
       "package.json"
     ],
     "asar": true,
-    "compression": "maximum",
     "win": {
       "target": [
         "nsis",
@@ -65,6 +64,8 @@
       "artifactName": "PasteBoard-Plus-${version}-win-${arch}.${ext}"
     },
     "nsis": {
+      "script": "scripts/installer.nsi",
+      "installerLanguages": ["zh_CN", "en_US"],
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
