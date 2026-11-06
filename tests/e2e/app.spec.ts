@@ -57,7 +57,7 @@ test('settings records shortcut and clear keeps pinned entries by default', asyn
 
 test('AI configuration explains provider privacy and never persists a preview key', async ({ page }) => {
   await page.goto('/'); await page.getByRole('button', { name: '管理记录', exact: true }).click(); await page.getByRole('button', { name: '体验示例' }).click();
-  await page.getByRole('button', { name: '连接 AI，开始翻译' }).click();
+  await page.getByRole('button', { name: '设置 AI 翻译' }).click();
   await expect(page.getByLabel('API 服务地址')).toHaveValue('https://api.openai.com/v1');
   await expect(page.getByText('当前环境仅在本次会话保存密钥')).toBeVisible();
   await page.getByLabel('API 密钥', { exact: true }).fill('preview-test-key');
@@ -73,7 +73,7 @@ test('small-screen preview stays within the viewport', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.getByRole('button', { name: '查看：Design is how it feels.' }).click();
   await expect(page.getByTestId('original-content')).toBeVisible();
-  await expect(page.getByRole('button', { name: '连接 AI，开始翻译' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '翻译这段内容' })).toBeVisible();
   await page.getByRole('button', { name: '关闭详情' }).click();
   await expect(page.getByTestId('original-content')).not.toBeVisible();
   await page.screenshot({ path: 'test-results/mobile.png', fullPage: true });
@@ -106,4 +106,26 @@ test('compact first, management and settings open explicitly, unlimited capacity
   await expect(page.getByRole('heading', { name: '所有记录' })).toBeVisible();
   await page.getByRole('button', { name: '返回小窗口' }).click();
   await expect(page.getByTestId('compact-board')).toBeVisible();
+});
+
+
+test('Win11 popup translates with the supplied dictionary without an API and copies its translation', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/');
+  await page.getByRole('button', { name: '管理记录', exact: true }).click();
+  await page.evaluate(() => navigator.clipboard.writeText('bread'));
+  await page.getByRole('button', { name: '捕获剪贴板', exact: true }).click();
+  await page.getByRole('button', { name: '返回小窗口', exact: true }).click();
+  await page.getByRole('button', { name: '翻译：bread', exact: true }).click();
+  await expect(page.getByTestId('inline-translation')).toContainText('面包');
+  await expect(page.getByTestId('inline-translation')).toContainText('本地词库');
+  await page.getByRole('button', { name: '粘贴译文', exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('面包');
+  await page.getByTestId('compact-board').screenshot({ path: 'test-results/win11-popup.png' });
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
+  await expect(page.locator('.fluent-settings-nav')).toBeVisible();
+  await page.getByRole('button', { name: '翻译与词库', exact: true }).click();
+  await expect(page.getByLabel('翻译方式')).toHaveValue('auto');
+  await expect(page.getByText('32,159 条六向查询记录 · 离线可用')).toBeVisible();
+  await page.screenshot({ path: 'test-results/win11-settings.png', fullPage: true });
 });

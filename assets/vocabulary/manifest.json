@@ -1,0 +1,123 @@
+{
+  "formatVersion": "1.0",
+  "packageId": "typelingo-vocab-zh-en-ja",
+  "packageVersion": "0.1.0-draft",
+  "status": "draft-not-reached-10000",
+  "displayName": "TypeLingo 中英日本地词库（初稿）",
+  "languages": [
+    "zh",
+    "en",
+    "ja"
+  ],
+  "languageNames": {
+    "zh": "简体中文",
+    "en": "English",
+    "ja": "日本語"
+  },
+  "directionSchema": [
+    {
+      "sourceLanguage": "zh",
+      "targetLanguage": "en"
+    },
+    {
+      "sourceLanguage": "en",
+      "targetLanguage": "zh"
+    },
+    {
+      "sourceLanguage": "zh",
+      "targetLanguage": "ja"
+    },
+    {
+      "sourceLanguage": "ja",
+      "targetLanguage": "zh"
+    },
+    {
+      "sourceLanguage": "en",
+      "targetLanguage": "ja"
+    },
+    {
+      "sourceLanguage": "ja",
+      "targetLanguage": "en"
+    }
+  ],
+  "style": "natural",
+  "files": {
+    "vocabulary": "vocabulary.jsonl",
+    "entries": "entries.jsonl",
+    "ambiguous": "ambiguous.jsonl",
+    "readme": "README.zh-CN.md",
+    "validationReport": "validation-report.json",
+    "checksums": "checksums.sha256",
+    "licensesDir": "licenses/"
+  },
+  "recordFormat": {
+    "vocabulary": [
+      "id",
+      "zh",
+      "en",
+      "ja",
+      "partOfSpeech",
+      "category",
+      "sense"
+    ],
+    "entry": [
+      "sourceLanguage",
+      "targetLanguage",
+      "sourceText",
+      "translatedText",
+      "style"
+    ]
+  },
+  "posTags": [
+    "adjective",
+    "adverb",
+    "conjunction",
+    "interjection",
+    "noun",
+    "numeral",
+    "phrase",
+    "preposition",
+    "pronoun",
+    "verb"
+  ],
+  "categories": [
+    "交通",
+    "人物关系",
+    "住宿",
+    "健康",
+    "办公沟通",
+    "商务交流",
+    "天气",
+    "学习",
+    "家居",
+    "工作",
+    "旅行",
+    "日常生活",
+    "时间",
+    "网络",
+    "计算机",
+    "购物",
+    "软件",
+    "饮食"
+  ],
+  "counts": {
+    "vocabulary": 6426,
+    "entries": 32159,
+    "duplicateTriples": 1120,
+    "duplicateEntries": 1119,
+    "conflictQueries": 2441,
+    "pendingReview": 0,
+    "directionRecords": {
+      "zh->en": 5495,
+      "en->zh": 5160,
+      "zh->ja": 5442,
+      "ja->zh": 5403,
+      "en->ja": 5175,
+      "ja->en": 5484
+    }
+  },
+  "offline": true,
+  "networkRequiredAtRuntime": false,
+  "license": "CC-BY-4.0 (compilation); see licenses/",
+  "note": "本地精确查询词库；未命中应回退到应用自身的在线翻译，本包不含翻译模型。"
+}

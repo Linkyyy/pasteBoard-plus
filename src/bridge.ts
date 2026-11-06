@@ -1,10 +1,23 @@
 import { classify } from '../shared/classify';
+import { LocalDictionary, type DictionaryData } from '../shared/local-dictionary';
 import { DEFAULT_SETTINGS, type ClipboardBridge, type ClipboardEntry, type Snapshot } from '../shared/types';
 
 declare global { interface Window { pasteboard?: ClipboardBridge } }
 
 function createBrowserBridge(): ClipboardBridge {
   const key = 'pasteboard-plus-preview-v1';
+  let dictionary: Promise<LocalDictionary> | undefined;
+  async function getDictionary() {
+    return dictionary ??= fetch('./vocabulary/typelingo.json.gz').then(async response => {
+      if (!response.ok) throw new Error('本地词库加载失败。');
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      // Static servers may already decode .gz responses via Content-Encoding.
+      const data = bytes[0] === 0x1f && bytes[1] === 0x8b
+        ? await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).json() as DictionaryData
+        : JSON.parse(new TextDecoder().decode(bytes)) as DictionaryData;
+      return new LocalDictionary(data);
+    }).catch(() => { dictionary = undefined; throw new Error('本地词库加载失败，请重试或重新打开应用。'); });
+  }
   let state: Snapshot = { windowMode: 'compact', entries: [], categories: [], settings: { ...DEFAULT_SETTINGS }, hasApiKey: false, keyStorage: 'session', shortcutRegistered: false, warning: null };
   try {
     const saved = localStorage.getItem(key);
@@ -44,6 +57,13 @@ function createBrowserBridge(): ClipboardBridge {
       if (entry.kind === 'image') throw new Error('示例图片用于预览；实际图片复制请使用桌面版。');
       await navigator.clipboard.writeText(entry.content); entry.copyCount++; changed();
     },
+    async paste(id, translated = false) { const entry = requireEntry(id);
+      if (entry.kind === 'image') throw new Error('示例图片用于预览，请在桌面版中粘贴图片。');
+      const text = translated ? entry.translation?.text : entry.content;
+      if (!text) throw new Error('这条记录还没有译文。');
+      await navigator.clipboard.writeText(text); entry.copyCount++; changed();
+      return { pasted: false, message: '已复制；浏览器预览请手动粘贴到输入框' };
+    },
     async copyTranslation(id) { const entry = requireEntry(id); if (entry.translation) await navigator.clipboard.writeText(entry.translation.text); },
     async pin(id) { const entry = requireEntry(id); entry.pinned = !entry.pinned; changed(); },
     async remove(id) { state.entries = state.entries.filter(entry => entry.id !== id); changed(); },
@@ -63,7 +83,14 @@ function createBrowserBridge(): ClipboardBridge {
       state.settings = settings;
       changed();
     },
-    async translate() { throw new Error('请在桌面版中配置 AI API 后使用翻译。浏览器预览不会发送内容。'); },
+    async translate(id, target) {
+      if (state.settings.translationMode === 'ai') throw new Error('AI API 请在桌面版中配置，浏览器预览不会发送内容。');
+      const entry = requireEntry(id);
+      if (entry.kind === 'image') throw new Error('图片暂不支持 OCR 翻译。');
+      const result = (await getDictionary()).lookup(entry.content, target, state.settings.sourceLanguage);
+      if (!result) throw new Error('本地词库未命中，或该词条有歧义。可在桌面设置中配置 AI API。');
+      entry.translation = result; changed(); return result;
+    },
     async getImage(id) { return requireEntry(id).image?.thumbnail || ''; },
     async windowAction() { /* No operating system window in the browser preview. */ },
     async setWindowMode(mode) { state.windowMode = mode; changed(); },

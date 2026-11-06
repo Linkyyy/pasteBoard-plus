@@ -11,4 +11,8 @@ export const settingsSchema = z.object({
   historyLimit: z.number().int().nonnegative().safe(), captureEnabled: z.boolean(), captureImages: z.boolean().default(false),
   apiEndpoint: endpointSchema, apiModel: z.string().trim().min(1).max(100), targetLanguage: languageSchema,
   apiKey: z.string().trim().max(2048).optional(), clearApiKey: z.boolean().optional(),
+  sourceLanguage: z.enum(['auto', 'zh-CN', 'en', 'ja']).default('auto'),
+  translationMode: z.enum(['auto', 'local', 'ai']).default('auto'),
+  fontSize: z.union([z.literal(14), z.literal(16), z.literal(18)]).default(16),
+  autoPaste: z.boolean().default(true),
 });

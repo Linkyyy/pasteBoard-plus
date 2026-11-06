@@ -1,2 +1,2 @@
-6370ad7b668061e714d621d378c5ea189716ac5f985f64db5a439c61739a86fd  PasteBoard-Plus-Setup-0.1.2-x64.exe
-a671990fe3bf9a649f59c0fce3ee64f24c13179d4032d1758210ddc7b7348717  PasteBoard-Plus-0.1.2-win-x64.zip
+f1e0a919a03edf2429b387c6a99c2c38a2654f4449bae488fffffe22b62b8f5f  PasteBoard-Plus-Setup-0.1.3-x64.exe
+bc3d32d4757fa888b37acebb67ac4455c8ab79841236eb9314826518e8774ffe  PasteBoard-Plus-0.1.3-win-x64.zip

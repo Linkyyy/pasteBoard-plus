@@ -11,7 +11,7 @@ const entrySchema = z.object({
   content: z.string().max(100_000), createdAt: z.number(), updatedAt: z.number(), pinned: z.boolean(),
   categoryId: z.string().uuid().nullable(), copyCount: z.number().int().nonnegative(),
   image: z.object({ thumbnail: z.string(), width: z.number().positive(), height: z.number().positive(), bytes: z.number().positive() }).optional(),
-  translation: z.object({ text: z.string().max(100_000), language: z.enum(['zh-CN', 'en', 'ja', 'ko', 'de', 'fr']), createdAt: z.number() }).optional(),
+  translation: z.object({ text: z.string().max(100_000), language: z.enum(['zh-CN', 'en', 'ja', 'ko', 'de', 'fr']), createdAt: z.number(), provider: z.enum(['local', 'ai']).optional() }).optional(),
   hash: z.string(),
 });
 const dataSchema = z.object({

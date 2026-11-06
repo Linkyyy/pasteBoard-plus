@@ -80,6 +80,20 @@ try {
   console.log('PASS compact 400x580 default, explicit manager/settings resizing, unlimited default and excluded files');
   console.log('PASS actual system clipboard: text, URL, code, automatic capture');
 
+  // Exercise the shipped dictionary through the real main-process IPC, with no API key.
+  await writeText('bread');
+  const localEntry = (await until(s => s.entries.some(entry => entry.content === 'bread'), 'capture dictionary word')).entries.find(entry => entry.content === 'bread');
+  const offline = await page.evaluate(id => window.pasteboard.translate(id, 'zh-CN'), localEntry.id);
+  assert.equal(offline.text, '面包'); assert.equal(offline.provider, 'local');
+  assert.equal(requests.length, 0, 'Offline translation must not contact the API');
+  await page.evaluate(() => window.pasteboard.setWindowMode('compact'));
+  const copied = await page.evaluate(id => window.pasteboard.paste(id, true), localEntry.id);
+  assert.equal(await desktop.evaluate(async ({ clipboard }) => clipboard.readText()), '面包');
+  if (process.platform !== 'win32') assert.equal(copied.pasted, false, 'Linux reports copy-only fallback honestly');
+  assert.equal(await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), false);
+  await page.evaluate(() => window.pasteboard.setWindowMode('manager'));
+  console.log('PASS shipped offline dictionary → IPC → translation copy; no API request and popup hides');
+
   await desktop.evaluate(async ({ clipboard, ClipboardItem, nativeImage, app }) => {
     const image = nativeImage.createFromPath(`${app.getAppPath()}/assets/icon.png`).toPNG();
     await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(image)], { type: 'image/png' }) })]);

@@ -16,6 +16,7 @@ const bridge: ClipboardBridge = {
   },
   capture: () => invoke('capture'), copy: (id, hide = false) => invoke('copy', id, hide),
   copyTranslation: id => invoke('copy-translation', id),
+  paste: (id, translated = false) => invoke('paste', id, translated),
   pin: id => invoke('pin', id), remove: id => invoke('remove', id), clear: all => invoke('clear', all),
   createCategory: name => invoke('create-category', name), deleteCategory: id => invoke('delete-category', id),
   assignCategory: (id, categoryId) => invoke('assign-category', id, categoryId),

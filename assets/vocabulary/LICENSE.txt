@@ -1,0 +1,14 @@
+TypeLingo-Vocabulary-zh-en-ja (compilation)
+Copyright (c) 2026 TypeLingo vocabulary authors
+
+This compilation is licensed under the Creative Commons Attribution 4.0
+International License (CC-BY-4.0).
+
+You may share and adapt this material for any purpose, even commercially,
+provided you give appropriate credit, indicate what changed, and do not
+impose additional restrictions.
+
+Full license text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+See REFERENCES.md for third-party sources consulted during authoring.
+No third-party dictionary data is redistributed in this package.

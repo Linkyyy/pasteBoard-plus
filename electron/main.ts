@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { HistoryStore } from './store';
 import { idSchema, languageSchema, settingsSchema } from './schema';
-import { translateText } from './translate';
+import { TranslationService } from './translation-service';
+import { WindowsFocus, type FocusContext } from './windows-focus';
+import { popupPosition } from '../shared/popup-position';
 import type { Snapshot } from '../shared/types';
 import { classify } from '../shared/classify';
 
@@ -19,8 +21,16 @@ let shortcutRegistered = false;
 let quitting = false;
 let lastFingerprint = '';
 let timer: ReturnType<typeof setInterval> | undefined;
+let focusTimer: ReturnType<typeof setInterval> | undefined;
+let pasting = false;
 let captureWarning: string | null = null;
 let windowMode: Snapshot['windowMode'] = 'compact';
+let focusTarget: FocusContext | null = null;
+let focusService: WindowsFocus | null = null;
+let focusError: string | null = null;
+let opening = 0;
+let openingPending = false;
+let translations: TranslationService;
 const pendingTranslations = new Map<string, Promise<unknown>>();
 let clipboardQueue: Promise<unknown> = Promise.resolve();
 function withClipboard<T>(action: () => Promise<T>): Promise<T> {
@@ -36,7 +46,7 @@ function canSecurelyStoreKey() {
 function snapshot(): Snapshot {
   return { windowMode, entries: store.entries, categories: store.categories, settings: store.settings,
     hasApiKey: Boolean(apiKey), keyStorage: canSecurelyStoreKey() ? 'secure' : 'session',
-    shortcutRegistered, warning: captureWarning || store.warning };
+    shortcutRegistered, warning: captureWarning || store.warning, insertion: { supported: process.platform === 'win32' && !focusError, hasTarget: Boolean(focusTarget?.editable), caretLocated: Boolean(focusTarget?.caretLocated), message: focusError } };
 }
 function broadcast() {
   if (window && !window.isDestroyed()) window.webContents.send('pasteboard:changed', snapshot());
@@ -44,12 +54,15 @@ function broadcast() {
 }
 function showWindow() {
   if (!window) return;
-  if (window.isMinimized()) window.restore();
-  window.show(); window.focus();
+  if (windowMode === 'compact' && process.platform === 'win32') window.showInactive();
+  else { if (window.isMinimized()) window.restore(); window.show(); window.focus(); }
 }
 function setWindowMode(mode: Snapshot['windowMode']) {
   if (!window) return;
   windowMode = mode;
+  if (mode === 'manager') { opening++; openingPending = false; focusTarget = null; if (process.platform === 'win32') globalShortcut.unregister('Escape'); }
+  window.setFocusable(mode !== 'compact' || process.platform !== 'win32');
+  window.setSkipTaskbar(mode === 'compact' && process.platform === 'win32');
   if (window.isMaximized()) window.unmaximize();
   window.setMinimumSize(mode === 'compact' ? 320 : 1060, mode === 'compact' ? 380 : 720);
   window.setResizable(mode === 'manager');
@@ -58,11 +71,41 @@ function setWindowMode(mode: Snapshot['windowMode']) {
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const width = Math.min(mode === 'compact' ? 400 : 1360, area.width);
   const height = Math.min(mode === 'compact' ? 580 : 900, area.height);
-  window.setBounds({ width, height, x: area.x + Math.round((area.width - width) / 2), y: area.y + Math.round((area.height - height) / 2) });
+  if (mode === 'compact') positionCompact();
+  else window.setBounds({ width, height, x: area.x + Math.round((area.width - width) / 2), y: area.y + Math.round((area.height - height) / 2) });
   broadcast();
 }
-function openCompact() { setWindowMode('compact'); showWindow(); }
-function toggleWindow() { if (window?.isVisible() && window.isFocused() && windowMode === 'compact') window.hide(); else openCompact(); }
+function ownWindowHandle() {
+  const handle = window!.getNativeWindowHandle();
+  return handle.length >= 8 ? handle.readBigUInt64LE(0).toString() : String(handle.readUInt32LE(0));
+}
+function positionCompact() {
+  if (!window) return;
+  let anchor = { ...screen.getCursorScreenPoint(), width: 1, height: 1 };
+  if (focusTarget && (focusTarget.caretLocated || focusTarget.editable) && focusTarget.height > 0) {
+    const top = screen.screenToDipPoint({ x: Math.round(focusTarget.x), y: Math.round(focusTarget.y) });
+    const bottom = screen.screenToDipPoint({ x: Math.round(focusTarget.x + focusTarget.width), y: Math.round(focusTarget.y + focusTarget.height) });
+    anchor = { ...top, width: Math.max(1, bottom.x - top.x), height: Math.max(1, bottom.y - top.y) };
+  }
+  const bounds = popupPosition(anchor, screen.getDisplayNearestPoint(anchor).workArea, 400, 580);
+  const current = window.getBounds();
+  if (current.x !== bounds.x || current.y !== bounds.y || current.width !== bounds.width || current.height !== bounds.height) window.setBounds(bounds);
+}
+async function openCompact() {
+  const generation = ++opening;
+  openingPending = true;
+  focusTarget = null; focusError = null;
+  if (focusService && window) {
+    try {
+      const target = await focusService.capture(ownWindowHandle());
+      if (generation !== opening) return;
+      focusTarget = target;
+    } catch (error) { focusError = error instanceof Error ? error.message : '无法读取输入光标。'; }
+  }
+  if (generation !== opening) return;
+  openingPending = false; setWindowMode('compact'); showWindow();
+}
+function toggleWindow() { if ((window?.isVisible() && windowMode === 'compact') || openingPending) { opening++; openingPending = false; window?.hide(); } else void openCompact(); }
 function updateTray() {
   tray?.setContextMenu(Menu.buildFromTemplate([
     { label: '打开剪贴板', click: openCompact },
@@ -148,22 +191,47 @@ function handle(channel: string, handler: (...args: any[]) => unknown) {
     catch (error) { return { ok: false, error: error instanceof z.ZodError ? error.issues[0]?.message || '输入无效。' : error instanceof Error ? error.message : '操作失败，请重试。' }; }
   });
 }
+async function writeEntry(id: string, translated: boolean) {
+  const entry = store.require(id);
+  if (translated && !entry.translation) throw new Error('这条记录还没有译文。');
+  if (entry.kind === 'image' && !translated) {
+    const png = store.readImage(id);
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })]);
+    const imageBlob = await readBlob(await clipboard.read(), 'image/png');
+    const copiedPng = imageBlob ? nativeImage.createFromBuffer(Buffer.from(await imageBlob.arrayBuffer())).toPNG() : png;
+    lastFingerprint = createHash('sha256').update(copiedPng).digest('hex');
+  } else {
+    const content = translated ? entry.translation!.text : entry.content;
+    await clipboard.writeText(content); lastFingerprint = createHash('sha256').update(content).digest('hex');
+  }
+  store.recordCopy(id); broadcast();
+}
 function registerHandlers() {
   handle('snapshot', snapshot);
-  handle('window-mode', rawMode => { setWindowMode(z.enum(['compact', 'manager']).parse(rawMode)); showWindow(); });
+  handle('window-mode', async rawMode => {
+    const mode = z.enum(['compact', 'manager']).parse(rawMode);
+    if (mode === 'compact') { window?.hide(); await new Promise(resolve => setTimeout(resolve, 50)); await openCompact(); }
+    else { setWindowMode(mode); showWindow(); }
+  });
   handle('capture', () => withClipboard(() => capture(true)));
   handle('copy', (rawId, rawHide) => withClipboard(async () => {
-    const id = idSchema.parse(rawId); const hide = z.boolean().parse(rawHide);
-    const entry = store.require(id);
-    if (entry.kind === 'image') {
-      const png = store.readImage(id);
-      await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })]);
-      const items = await clipboard.read();
-      const imageBlob = await readBlob(items, 'image/png');
-      const copiedPng = imageBlob ? nativeImage.createFromBuffer(Buffer.from(await imageBlob.arrayBuffer())).toPNG() : png;
-      lastFingerprint = createHash('sha256').update(copiedPng).digest('hex');
-    } else { await clipboard.writeText(entry.content); lastFingerprint = createHash('sha256').update(entry.content).digest('hex'); }
-    store.recordCopy(id); broadcast(); if (hide) window?.hide();
+    await writeEntry(idSchema.parse(rawId), false);
+    if (z.boolean().parse(rawHide)) window?.hide();
+  }));
+  handle('paste', (rawId, rawTranslated) => withClipboard(async () => {
+    if (windowMode !== 'compact') throw new Error('请从剪贴板小窗口选择要粘贴的词条。');
+    await writeEntry(idSchema.parse(rawId), z.boolean().parse(rawTranslated));
+    if (process.platform === 'win32' && store.settings.autoPaste) {
+      if (!focusService || !focusTarget) throw new Error('内容已复制。请先在输入框中按快捷键唤出剪贴板。');
+      pasting = true;
+      try {
+        const result = await focusService.paste(focusTarget);
+        if (!result.pasted) throw new Error(result.message);
+        window?.hide(); return result;
+      } finally { pasting = false; }
+    }
+    window?.hide();
+    return { pasted: false, message: process.platform === 'win32' ? '已复制到剪贴板' : '已复制；此平台请返回输入框手动粘贴' };
   }));
   handle('pin', rawId => { store.togglePin(idSchema.parse(rawId)); broadcast(); });
   handle('copy-translation', rawId => withClipboard(async () => {
@@ -200,7 +268,7 @@ function registerHandlers() {
     const id = idSchema.parse(rawId); const language = languageSchema.parse(rawLanguage); const entry = store.require(id);
     if (entry.kind === 'image') throw new Error('图片暂不支持文字识别，请选择文字记录进行翻译。');
     if (pendingTranslations.has(id)) return pendingTranslations.get(id);
-    const pending = translateText(entry.content, language, store.settings, apiKey).then(translation => {
+    const pending = translations.translate(entry.content, language, store.settings, apiKey).then(translation => {
       store.setTranslation(id, translation); broadcast(); return translation;
     }).finally(() => pendingTranslations.delete(id));
     pendingTranslations.set(id, pending); return pending;
@@ -218,7 +286,7 @@ function registerHandlers() {
 async function createWindow() {
   window = new BrowserWindow({
     width: 400, height: 580, minWidth: 320, minHeight: 380, frame: false,
-    resizable: false, maximizable: false, alwaysOnTop: true, hasShadow: true,
+    resizable: false, maximizable: false, alwaysOnTop: true, hasShadow: true, focusable: process.platform !== 'win32', skipTaskbar: process.platform === 'win32',
     title: 'PasteBoard Plus', backgroundColor: '#f7f8fa', icon: join(app.getAppPath(), 'assets/icon.png'),
     show: false,
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true },
@@ -227,7 +295,11 @@ async function createWindow() {
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   window.on('close', event => { if (!quitting) { event.preventDefault(); window?.hide(); } });
-  window.once('ready-to-show', showWindow);
+  window.on('show', () => {
+    if (process.platform === 'win32' && windowMode === 'compact') globalShortcut.register('Escape', () => { opening++; openingPending = false; window?.hide(); });
+  });
+  window.on('hide', () => { if (process.platform === 'win32') globalShortcut.unregister('Escape'); });
+  window.once('ready-to-show', () => void openCompact());
   const devUrl = process.env.PASTEBOARD_DEV_URL;
   if (!app.isPackaged && devUrl === 'http://localhost:5173') await window.loadURL(devUrl);
   else await window.loadFile(join(app.getAppPath(), 'dist/index.html'));
@@ -237,13 +309,19 @@ if (!hasLock) app.quit();
 else {
   app.on('second-instance', openCompact);
   app.on('activate', openCompact);
-  app.on('before-quit', () => { quitting = true; if (timer) clearInterval(timer); globalShortcut.unregisterAll(); tray?.destroy(); });
+  app.on('before-quit', () => { quitting = true; if (timer) clearInterval(timer); if (focusTimer) clearInterval(focusTimer); globalShortcut.unregisterAll(); tray?.destroy(); focusService?.stop(); });
   void app.whenReady().then(async () => {
     app.setAppUserModelId('com.pasteboard.plus');
     store = new HistoryStore(app.getPath('userData'));
     if (store.encryptedKey && canSecurelyStoreKey()) {
       try { apiKey = safeStorage.decryptString(Buffer.from(store.encryptedKey, 'base64')); }
       catch { store.warning = '无法解密之前保存的 API 密钥，请在设置中重新输入。'; }
+    }
+    translations = new TranslationService(join(app.getAppPath(), 'dist/vocabulary/typelingo.json.gz'));
+    if (process.platform === 'win32') {
+      const base = app.getAppPath().endsWith('.asar') ? app.getAppPath() + '.unpacked' : app.getAppPath();
+      focusService = new WindowsFocus(join(base, 'assets/windows'));
+      void focusService.warm().catch(error => { focusError = error instanceof Error ? error.message : 'Windows 输入服务不可用。'; broadcast(); });
     }
     registerHandlers();
     try { shortcutRegistered = globalShortcut.register(store.settings.shortcut, toggleWindow); } catch { shortcutRegistered = false; }
@@ -259,5 +337,19 @@ else {
       finally { polling = false; }
     };
     void poll(); timer = setInterval(() => void poll(), 800);
+    let following = false;
+    focusTimer = setInterval(async () => {
+      if (following || pasting || openingPending || windowMode !== 'compact' || !window?.isVisible() || !focusService || !focusTarget?.editable) return;
+      following = true;
+      const previous = focusTarget;
+      try {
+        const current = await focusService.capture(ownWindowHandle());
+        if (pasting || windowMode !== 'compact' || !window?.isVisible() || focusTarget !== previous) return;
+        if (current.window !== previous.window || current.control !== previous.control || (previous.elementKey && current.elementKey !== previous.elementKey)) { focusTarget = null; window.hide(); return; }
+        focusTarget = current; positionCompact();
+      } catch { /* Keep the original target; paste performs its own final validation. */ }
+      finally { following = false; }
+    }, 500);
+
   }).catch(error => { console.error('PasteBoard startup failed:', error instanceof Error ? error.message : 'Unknown error'); app.exit(1); });
 }

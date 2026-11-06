@@ -4,7 +4,7 @@ export type Language = 'zh-CN' | 'en' | 'ja' | 'ko' | 'de' | 'fr';
 export const LANGUAGES: Record<Language, string> = {
   'zh-CN': '简体中文', en: '英语', ja: '日语', ko: '韩语', de: '德语', fr: '法语',
 };
-export interface Translation { text: string; language: Language; createdAt: number }
+export interface Translation { text: string; language: Language; createdAt: number; provider?: 'local' | 'ai' }
 export interface ClipboardEntry {
   id: string;
   kind: ContentKind;
@@ -26,6 +26,10 @@ export interface Settings {
   apiEndpoint: string;
   apiModel: string;
   targetLanguage: Language;
+  sourceLanguage: 'auto' | 'zh-CN' | 'en' | 'ja';
+  translationMode: 'auto' | 'local' | 'ai';
+  fontSize: 14 | 16 | 18;
+  autoPaste: boolean;
 }
 export interface SettingsInput extends Settings { apiKey?: string; clearApiKey?: boolean }
 export interface Snapshot {
@@ -37,6 +41,7 @@ export interface Snapshot {
   keyStorage: 'secure' | 'session';
   shortcutRegistered: boolean;
   warning: string | null;
+  insertion?: { supported: boolean; hasTarget: boolean; caretLocated: boolean; message: string | null };
 }
 export interface ClipboardBridge {
   platform: string;
@@ -46,6 +51,7 @@ export interface ClipboardBridge {
   capture(): Promise<{ captured: boolean; message: string }>;
   copy(id: string, hide?: boolean): Promise<void>;
   copyTranslation(id: string): Promise<void>;
+  paste(id: string, translated?: boolean): Promise<{ pasted: boolean; message: string }>;
   pin(id: string): Promise<void>;
   remove(id: string): Promise<void>;
   clear(includePinned: boolean): Promise<void>;
@@ -62,4 +68,5 @@ export interface ClipboardBridge {
 export const DEFAULT_SETTINGS: Settings = {
   shortcut: 'CommandOrControl+Shift+V', historyLimit: 0, captureEnabled: true, captureImages: false,
   apiEndpoint: 'https://api.openai.com/v1', apiModel: 'gpt-4o-mini', targetLanguage: 'zh-CN',
+  sourceLanguage: 'auto', translationMode: 'auto', fontSize: 16, autoPaste: true,
 };

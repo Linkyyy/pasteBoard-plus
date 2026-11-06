@@ -1,7 +1,7 @@
 {
   "name": "pasteboard-plus",
   "productName": "PasteBoard Plus",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A thoughtful clipboard companion with collections and AI translation.",
   "author": "PasteBoard Plus",
   "license": "MIT",
@@ -57,7 +57,13 @@
       "package.json"
     ],
     "asar": true,
-    "electronLanguages": ["zh-CN", "en-US"],
+    "asarUnpack": [
+      "assets/windows/**/*"
+    ],
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
     "win": {
       "target": [
         "nsis",

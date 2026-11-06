@@ -6,7 +6,7 @@ import { extractFile, listPackage } from '@electron/asar';
 const root = resolve(process.argv[2] || 'release/win-unpacked');
 const archive = join(root, 'resources/app.asar');
 const files = listPackage(archive);
-for (const required of ['/dist/index.html', '/dist-electron/main.cjs', '/dist-electron/preload.cjs', '/assets/icon.png', '/node_modules/undici/package.json']) {
+for (const required of ['/dist/index.html', '/dist/vocabulary/typelingo.json.gz', '/dist-electron/main.cjs', '/dist-electron/preload.cjs', '/assets/icon.png', '/assets/vocabulary/LICENSE.txt', '/node_modules/undici/package.json']) {
   assert(files.includes(required), `Missing runtime file: ${required}`);
 }
 for (const name of ['react', 'react-dom', 'lucide-react', 'scheduler', 'zod', 'electron', 'typescript', 'vite']) {
@@ -18,5 +18,8 @@ assert.deepEqual(locales, ['en-US.pak', 'zh-CN.pak']);
 const product = JSON.parse(extractFile(archive, 'package.json').toString());
 const project = JSON.parse(await readFile('package.json', 'utf8'));
 assert.equal(product.version, project.version);
+for (const name of ['FocusBridge.cs', 'focus-host.ps1']) {
+  assert((await stat(join(root, 'resources/app.asar.unpacked/assets/windows', name))).isFile(), `Missing external Windows helper asset: ${name}`);
+}
 console.log(`Package verified: version ${product.version}, runtime dependencies present, no duplicated frontend dependencies or source maps.`);
 console.log(`Application archive: ${((await stat(archive)).size / 1024 / 1024).toFixed(2)} MiB; Chromium locales: ${locales.join(', ')}`);
