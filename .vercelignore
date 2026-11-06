@@ -1,0 +1,10 @@
+*
+!website/
+!website/**
+!public/
+!public/icon.svg
+!package.json
+!vercel.json
+website/dist/
+website/node_modules/
+website/*.png

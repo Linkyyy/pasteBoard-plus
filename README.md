@@ -37,6 +37,8 @@ Windows 小窗口保留输入焦点，因此方向键和打字仍作用于原输
 
 ## 运行
 
+中文官网源码位于 [website](website)，使用独立静态构建。仓库已包含 Vercel 配置；构建与发布说明见 [官网 README](website/README.md)。
+
 需要 **Node.js 24+** 和 npm。使用已有 checkout；每个云任务已隔离，无需创建 Git worktree。
 
 ```bash

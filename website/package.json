@@ -1,0 +1,12 @@
+{
+  "name": "pasteboard-plus-website",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node serve.mjs",
+    "preview": "node serve.mjs --production"
+  },
+  "engines": { "node": ">=20" }
+}

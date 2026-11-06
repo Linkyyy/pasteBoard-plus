@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fafbf9">
+  <title>PasteBoard Plus — 复制过的灵感，随时接着用</title>
+  <meta name="description" content="一个顺手的 Windows 剪贴板。快捷键唤出小窗口，保存无限历史、分类收纳文字和图片，支持中英日离线词库与 AI API 翻译。免费下载，开源可查看。">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="PasteBoard Plus — 复制过的灵感，随时接着用">
+  <meta property="og:description" content="小窗口，无限历史，中英日翻译。把复制过的内容，变成随时可用的灵感。">
+  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="/icon.svg">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4 1-4-2-6-2m12 5v-4c0-1-.4-2-1-2 3-.3 6-1.5 6-6a5 5 0 0 0-1.4-3.5A5 5 0 0 0 18.5 3S17 2.5 14 4a13 13 0 0 0-6 0C5 2.5 3.5 3 3.5 3a5 5 0 0 0-.1 3.5A5 5 0 0 0 2 10c0 4.5 3 5.7 6 6-.6.5-1 1.4-1 2v4"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="16" rx="2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6m-6 4h4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="m8 3 8 0-1 7 3 3v2H6v-2l3-3-1-7ZM12 15v6"/></symbol>
+    <symbol id="i-translate" viewBox="0 0 24 24"><path d="M3 5h12M9 3v2m-4 4c1 4 4 6 8 8M12 5c0 5-3 9-8 12m10 4 4-10 4 10m-7-3h6"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m21 15-6-6L3 21"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6l-9-4Z"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 3 6 6 3-6 3-3 6-3-6-6-3 6-3 3-6Zm7-2v4m-2-2h4"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h4l3 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></symbol>
+    <symbol id="i-win" viewBox="0 0 24 24"><path d="M3 4h8v8H3zM14 4h8v8h-8zM3 15h8v8H3zM14 15h8v8h-8z" stroke="none" fill="currentColor"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="m10 13 4-4m-5 7-2 2a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0m0 4a4 4 0 0 1 6 0l5-5a4 4 0 0 0-6-6l-2 2" transform="translate(1 2) scale(.9)"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  </defs></svg>
+
+  <header class="site-header">
+    <div class="nav-wrap container">
+      <a class="brand" href="#" aria-label="PasteBoard Plus 首页"><img src="/icon.svg" alt="" width="34" height="34"><span>PasteBoard<span class="brand-plus"> Plus</span></span></a>
+      <button class="menu-button" aria-label="打开导航" aria-expanded="false" aria-controls="site-nav"><svg class="icon"><use href="#i-menu"/></svg></button>
+      <nav id="site-nav" aria-label="主导航"><a href="#features">功能</a><a href="#translate">翻译</a><a href="#faq">常见问题</a><a class="nav-github" href="{{REPOSITORY}}" target="_blank" rel="noopener noreferrer"><svg class="icon"><use href="#i-github"/></svg><span>GitHub</span></a><a class="button nav-download" href="#download">免费下载 <svg class="icon"><use href="#i-arrow"/></svg></a></nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero container" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <a class="release-pill" href="#download"><span class="status-dot"></span>为 Windows 打造<span class="pill-divider"></span>v{{VERSION}}<svg class="icon"><use href="#i-arrow"/></svg></a>
+        <h1 id="hero-title">复制过的灵感，<br><span>随时接着用。</span></h1>
+        <p class="hero-description">文字、链接、图片，都留在手边。<br>一个快捷键，找回刚才的内容，<br class="desktop-break">也让不同语言的表达更近一点。</p>
+        <div class="hero-actions"><a class="button primary" href="{{INSTALLER}}"><svg class="icon"><use href="#i-win"/></svg>下载 Windows 版<svg class="icon small"><use href="#i-download"/></svg></a><a class="button quiet" href="#features">了解更多 <svg class="icon"><use href="#i-arrow"/></svg></a></div>
+        <p class="hero-meta">免费开源<span>·</span>无需注册<span>·</span>完整离线安装包</p>
+        <div class="shortcut-caption"><div class="key-group"><kbd>Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>V</kbd></div><span>唤出你的小小灵感库</span></div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="demo-workspace" aria-label="剪贴板交互演示">
+          <div class="workspace-top"><span><span class="mini-dot"></span>我的工作区</span><span class="workspace-date">专注，接着往下写。</span></div>
+          <div class="note-window"><div class="note-title"><span><svg class="icon"><use href="#i-folder"/></svg>灵感便签.txt</span><span class="window-decoration" aria-hidden="true">−　□　×</span></div><div class="note-content"><span class="note-eyebrow">TODAY'S IDEAS</span><label for="demo-input">每一个好想法，都值得留下。</label><textarea id="demo-input" rows="3" spellcheck="false" placeholder="点选剪贴板词条，试试粘贴…">下一段好想法，从这里开始。</textarea><button id="demo-toggle" class="demo-shortcut" aria-expanded="true" aria-controls="demo-board"><svg class="icon"><use href="#i-clip"/></svg>调出剪贴板<span>Ctrl + Shift + V</span></button></div></div>
+          <div id="demo-board" class="demo-board">
+            <div class="demo-caption"><span>PasteBoard Plus</span><button class="demo-close" aria-label="收起演示剪贴板">×</button></div>
+            <div class="demo-tabs" role="tablist" aria-label="演示分类"><button role="tab" aria-label="全部演示记录" aria-selected="true" data-tab="all"><svg class="icon"><use href="#i-clip"/></svg></button><button role="tab" aria-label="置顶演示记录" aria-selected="false" data-tab="pinned"><svg class="icon"><use href="#i-pin"/></svg></button><button role="tab" aria-label="已翻译演示记录" aria-selected="false" data-tab="translated"><svg class="icon"><use href="#i-translate"/></svg></button><span>简体中文⌄</span></div>
+            <div class="demo-board-title"><strong>剪贴板</strong><span>点击词条试试看</span></div>
+            <div class="demo-records">
+              <article class="demo-record selected" data-entry="bread" data-pinned="true"><button class="demo-paste" data-content="bread" aria-label="在演示输入框粘贴 bread">bread<span class="record-dots" aria-hidden="true">···</span></button><div class="demo-record-footer"><span>文本</span><button id="demo-translate" aria-expanded="false" aria-controls="demo-translation"><svg class="icon"><use href="#i-translate"/></svg>翻译</button><svg class="icon pin-icon" aria-label="已置顶"><use href="#i-pin"/></svg></div><div id="demo-translation" class="demo-translation" hidden><span>简体中文 · 本地词库</span><div><strong>面包</strong><button class="demo-paste translation-paste" data-content="面包">粘贴译文 <svg class="icon"><use href="#i-arrow"/></svg></button></div></div></article>
+              <article class="demo-record" data-entry="idea"><button class="demo-paste" data-content="把复杂留给工具，把专注留给自己。" aria-label="在演示输入框粘贴灵感">把复杂留给工具，<br>把专注留给自己。<span class="record-dots" aria-hidden="true">···</span></button><div class="demo-record-footer"><span>文本</span><svg class="icon pin-icon"><use href="#i-pin"/></svg></div></article>
+              <article class="demo-record demo-link-record" data-entry="url"><button class="demo-paste" data-content="https://github.com/Linkyyy/pasteBoard-plus" aria-label="在演示输入框粘贴项目链接"><svg class="icon"><use href="#i-link"/></svg>github.com/Linkyyy/pasteBoard-plus</button></article>
+            </div>
+            <div class="demo-footer"><span><svg class="icon"><use href="#i-shield"/></svg>历史无限条</span><span><i></i>正在记录</span></div>
+          </div>
+          <div class="demo-toast" role="status" aria-live="polite" hidden><svg class="icon"><use href="#i-check"/></svg><span>已粘贴，接着写吧。</span></div>
+          <span class="workspace-decoration decoration-one" aria-hidden="true">Aa</span><span class="workspace-decoration decoration-two" aria-hidden="true">文</span>
+        </div>
+        <p class="demo-disclaimer"><span class="status-dot"></span>可点击的交互演示<span>·</span>试试词条旁的「翻译」</p>
+      </div>
+    </section>
+
+    <section class="quick-facts container" aria-label="软件亮点"><div><strong>400<span>×</span>580</strong><span>刚刚好的小窗口</span></div><div><strong class="infinity">∞</strong><span>默认不设历史条数上限</span></div><div><strong>32,159</strong><span>中英日离线查询记录</span></div><div><svg class="icon"><use href="#i-shield"/></svg><strong class="fact-local">本地保存</strong><span>你的历史，留在你的电脑</span></div></section>
+
+    <section class="features section container" id="features" aria-labelledby="features-title">
+      <div class="section-heading"><p class="eyebrow">SMALL WINDOW. MORE POSSIBILITIES.</p><h2 id="features-title">少一次寻找，<br>多一点专注。</h2><p>不用在窗口之间来回翻找。<br>复制过的内容，就在你需要的地方。</p></div>
+      <div class="bento-grid">
+        <article class="feature-card feature-focus"><span class="feature-icon blue"><svg class="icon"><use href="#i-clip"/></svg></span><h3>顺手，才会一直用。</h3><p>快捷键调出小窗口，点选词条后收起。<br>Windows 自动粘贴让内容回到原输入框。</p><div class="shortcut-illustration" aria-hidden="true"><kbd>Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd class="key-v">V<span>你的剪贴板</span></kbd></div><span class="card-footnote">快捷键可自定义，避开系统占用。</span></article>
+        <article class="feature-card feature-history"><span class="feature-icon peach"><svg class="icon"><use href="#i-pin"/></svg></span><h3>不止记住最后一次。</h3><p>历史默认无限条，重启后依然在。<br>重要内容置顶，也能自行设置容量。</p><div class="history-illustration" aria-hidden="true"><div><i></i><span>刚刚</span><strong>那个还没写完的好想法</strong><svg class="icon"><use href="#i-pin"/></svg></div><div><i></i><span>昨天</span><strong>上次找到的参考链接</strong></div><div><i></i><span>更早</span><strong>留给下一次创作的灵感</strong></div></div></article>
+        <article class="feature-card feature-organize"><span class="feature-icon green"><svg class="icon"><use href="#i-folder"/></svg></span><h3>各有归处，一眼找到。</h3><p>文字、链接、代码自动分类。再建几个<br>自己的分类，工作、生活都能收好。</p><div class="category-chips"><span><svg class="icon"><use href="#i-clip"/></svg>文字</span><span><svg class="icon"><use href="#i-link"/></svg>链接</span><span><svg class="icon"><use href="#i-image"/></svg>图片</span><span class="custom-category">+ 我的灵感</span></div></article>
+        <article class="feature-card feature-image"><span class="feature-icon lavender"><svg class="icon"><use href="#i-image"/></svg></span><h3>好画面，也值得保留。</h3><p>按需开启图片记录，完整保存原图。<br>不额外限制图片大小或像素数量。</p><div class="image-illustration" aria-hidden="true"><div class="landscape"><div class="sun"></div><div class="mountain mountain-back"></div><div class="mountain mountain-front"></div></div><div class="image-label"><svg class="icon"><use href="#i-image"/></svg>原图完整保存<svg class="icon"><use href="#i-check"/></svg></div></div><span class="card-footnote">图片记录默认关闭，文件与文件路径不记录。</span></article>
+      </div>
+    </section>
+
+    <section class="translation-section section" id="translate" aria-labelledby="translate-title"><div class="translation-layout container">
+      <div class="translation-copy"><p class="eyebrow">WORDS, WITHOUT BORDERS.</p><h2 id="translate-title">换一种语言，<br>灵感一样顺畅。</h2><p class="section-description">词条旁边，翻译就在一步之内。<br>日常查词用本地词库，整句表达交给你配置的 AI。</p><div class="translation-points"><div><span class="feature-icon green"><svg class="icon"><use href="#i-translate"/></svg></span><div><h3>中 · 英 · 日，离线也能查</h3><p>内置 TypeLingo 三语词库，无需 API Key。<br>已有词条精确匹配，歧义与未命中会明确提示。</p></div></div><div><span class="feature-icon blue"><svg class="icon"><use href="#i-spark"/></svg></span><div><h3>你选服务，AI 帮你翻译</h3><p>配置兼容 OpenAI 的地址、模型与密钥。<br>只有点击翻译时，才发送选中的文字。</p></div></div></div><a class="text-link" href="#download">把翻译也放进剪贴板 <svg class="icon"><use href="#i-arrow"/></svg></a></div>
+      <div class="translation-visual"><div class="translation-preview"><div class="translation-preview-header"><span><svg class="icon"><use href="#i-translate"/></svg>一次复制，跨越语言</span><span class="offline-badge"><i></i>本地词库</span></div><div class="dictionary-source"><span>英语</span><strong>bread</strong><span>/bred/ <small>词库示例</small></span></div><div class="language-selector" role="group" aria-label="选择词库示例目标语言"><button data-language="zh" aria-pressed="true">简体中文</button><button data-language="ja" aria-pressed="false">日本語</button></div><div class="dictionary-result"><span id="dictionary-language">简体中文</span><strong id="dictionary-word" aria-live="polite">面包</strong><span id="dictionary-reading">日常食物，也可以是下一段故事的开始。</span></div><div class="translation-preview-footer"><svg class="icon"><use href="#i-check"/></svg>译文随记录保存，随时再次使用。</div></div><div class="translation-note"><svg class="icon"><use href="#i-shield"/></svg><p>本地词库模式不联网。<br>需要整句翻译时，再接入 AI API。</p></div></div>
+    </div></section>
+
+    <section class="privacy-strip container" id="privacy"><div class="privacy-seal"><svg class="icon"><use href="#i-shield"/></svg></div><div><h2>记录留在本地，选择权留给你。</h2><p>无需账号。历史保存在电脑中，AI 只接收你主动选择翻译的那一条文字。</p></div><a href="{{REPOSITORY}}" target="_blank" rel="noopener noreferrer">开源，可以看见 <svg class="icon"><use href="#i-arrow"/></svg></a></section>
+
+    <section class="download-section section container" id="download" aria-labelledby="download-title"><div class="download-panel"><div class="download-copy"><span class="download-eyebrow"><span class="status-dot"></span>READY WHEN YOU ARE.</span><h2 id="download-title">下一次复制，<br>让它更有用一点。</h2><p>把刚刚好的剪贴板，放进你的 Windows。<br>从此，复制过的好内容都有处可寻。</p><div class="download-details"><span><svg class="icon"><use href="#i-win"/></svg>Windows x64</span><span>v{{VERSION}}</span><span>免费开源</span></div></div><div class="download-options"><a class="download-option installer-option" href="{{INSTALLER}}"><span class="download-option-icon"><svg class="icon"><use href="#i-download"/></svg></span><span><strong>下载安装版</strong><small>EXE · {{INSTALLER_SIZE}} · 可选择安装位置</small></span><svg class="icon"><use href="#i-arrow"/></svg></a><a class="download-option portable-option" href="{{PORTABLE}}"><span class="download-option-icon"><svg class="icon"><use href="#i-folder"/></svg></span><span><strong>下载便携版</strong><small>ZIP · {{PORTABLE_SIZE}} · 完整解压后运行</small></span><svg class="icon"><use href="#i-arrow"/></svg></a><div class="download-links"><a href="{{CHECKSUMS}}" target="_blank" rel="noopener noreferrer">SHA-256 校验</a><span>·</span><a href="{{REPOSITORY}}/tree/v{{VERSION}}" target="_blank" rel="noopener noreferrer">查看版本源码</a></div><p class="download-note">当前安装包未签名。Windows 光标跟随与自动粘贴已实现，仍待实机验证。</p></div></div></section>
+
+    <section class="faq-section section container" id="faq" aria-labelledby="faq-title"><div class="faq-heading"><p class="eyebrow">A FEW THINGS TO KNOW.</p><h2 id="faq-title">你可能想知道。</h2><p>还有其他问题？<br><a class="text-link" href="{{REPOSITORY}}/issues" target="_blank" rel="noopener noreferrer">去 GitHub 和我们聊聊 <svg class="icon"><use href="#i-arrow"/></svg></a></p></div><div class="faq-list">
+      <details><summary>是免费的吗？需要注册账号吗？<span></span></summary><p>免费使用，无需注册账号。软件源码采用 MIT 许可证；内置 TypeLingo 词库汇编采用 CC BY 4.0，来源及许可随软件提供。使用自己的 AI API 时，相关费用按服务提供商的规则计算。</p></details>
+      <details><summary>能把快捷键设成 Windows + V 吗？<span></span></summary><p>Windows + V 已由系统剪贴板占用。默认使用 Ctrl + Shift + V，你可以在设置中更换组合；如果快捷键冲突，软件会提示你重新选择。</p></details>
+      <details><summary>历史记录真的没有条数限制吗？<span></span></summary><p>默认容量为 0，表示不按条数自动淘汰。也可以在设置中选择容量或输入自定义条数。记录仍占用电脑的磁盘空间；管理界面分批加载，重要内容可以置顶。</p></details>
+      <details><summary>没有 AI API，也能翻译整句话吗？<span></span></summary><p>内置词库支持中英日已有词条的精确查询，不是整句翻译模型。未配置 API 时自动使用词库；未命中或有歧义会明确提示。整句翻译、更多词汇或其他目标语言，需要配置兼容 OpenAI 的 AI API。也可以选择“仅本地词库”始终离线查词。</p></details>
+      <details><summary>图片、文件和隐私内容会怎样处理？<span></span></summary><p>图片记录默认关闭，手动启用后保存原图，不额外限制大小。文件和文件路径不加入新历史，也不会被移动或删除。历史是电脑本地的明文文件，程序会跳过来源应用标记为敏感的内容，但部分应用不会添加这类标记。AI 翻译只发送当前选中的文字，不发送整个历史或图片。</p></details>
+      <details><summary>点选后自动粘贴，支持哪些平台？<span></span></summary><p>自动粘贴面向 Windows：在原输入框按快捷键唤出，点选词条后发送粘贴并收起。该实现已完成编译检查，仍需 Windows 实机验证。目标改变、应用权限较高或系统策略限制时可能无法自动粘贴，可使用已复制的内容手动粘贴。macOS / Linux 当前只复制并收起。</p></details>
+    </div></section>
+  </main>
+
+  <footer class="site-footer container"><div><a class="brand" href="#"><img src="/icon.svg" alt="" width="30" height="30"><span>PasteBoard<span class="brand-plus"> Plus</span></span></a><p>留住复制的灵感，接着把事情做好。</p></div><div class="footer-links"><a href="{{REPOSITORY}}" target="_blank" rel="noopener noreferrer">GitHub <svg class="icon"><use href="#i-arrow"/></svg></a><a href="{{REPOSITORY}}/issues" target="_blank" rel="noopener noreferrer">反馈问题</a><a href="#privacy">隐私说明</a></div><div class="footer-bottom"><span>© 2026 PasteBoard Plus · MIT License</span><span>Made for your everyday flow.</span></div></footer>
+</body>
+</html>
