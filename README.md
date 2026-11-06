@@ -2,13 +2,13 @@
 
 给每一次复制，一个好去处。一个类似 Windows + V 的桌面剪贴板，基于 Electron、React 和 TypeScript，主要面向 Windows，也可在 macOS / Linux 上开发运行。
 
-## 下载 v0.1.3
+## 下载 v0.1.4
 
-- [Windows x64 安装程序](installers/PasteBoard-Plus-Setup-0.1.3-x64.exe?raw=true)：双击安装，可选择安装位置。
-- [Windows x64 便携 ZIP](installers/PasteBoard-Plus-0.1.3-win-x64.zip?raw=true)：完整解压后运行 `PasteBoard Plus.exe`。
+- [Windows x64 安装程序](installers/PasteBoard-Plus-Setup-0.1.4-x64.exe?raw=true)：双击安装，可选择安装位置。
+- [Windows x64 便携 ZIP](installers/PasteBoard-Plus-0.1.4-win-x64.zip?raw=true)：完整解压后运行 `PasteBoard Plus.exe`。
 - [SHA-256 校验文件](installers/SHA256SUMS.txt)。安装包通过 Git LFS 存储；直接点击上述链接下载即可。克隆时如需同时获取二进制文件，请安装 Git LFS。
 
-此版本采用 Win11 风格的浅色卡片、阴影与清晰文字。默认使用 400×580 小窗口，打开设置或管理记录时才切换到大窗口；内置用户提供的中英日词库。安装包未签名；Windows 保持焦点、光标跟随与自动粘贴已完成实现和编译检查，尚未在真实 Windows 桌面验证。
+此版本让小窗口、记录管理和设置统一采用 Win11 风格的浅色卡片、侧栏、阴影与清晰文字。管理与设置共用标题栏和居中搜索框，修正输入文字与图标的垂直对齐。默认使用 400×580 小窗口，打开设置或管理记录时才切换到大窗口；内置用户提供的中英日词库。安装包未签名；Windows 保持焦点、光标跟随与自动粘贴已完成实现和编译检查，尚未在真实 Windows 桌面验证。
 
 ## 已实现
 
@@ -30,6 +30,8 @@ Windows 小窗口保留输入焦点，因此方向键和打字仍作用于原输
 默认小窗口实测预览：
 
 <img src="docs/compact.png" alt="400×580 剪贴板小窗口" width="320" />
+
+<img src="docs/manager.png" alt="Win11 风格的记录管理大窗口" width="900" />
 
 <img src="docs/settings.png" alt="Win11 风格的翻译与词库设置" width="900" />
 
@@ -54,7 +56,7 @@ npm run dist:win     # Windows x64 安装程序 + 便携 ZIP
 npm run pack         # 当前平台的未压缩应用目录
 ```
 
-Windows 安装程序输出到 `release/PasteBoard-Plus-Setup-0.1.3-x64.exe`，可选择安装位置并创建桌面快捷方式。便携包输出到 `release/PasteBoard-Plus-0.1.3-win-x64.zip`。解压整个 ZIP 后运行 `PasteBoard Plus.exe`。Windows 输入辅助服务使用系统自带的 Windows PowerShell / .NET Framework，无需安装开发 SDK。
+Windows 安装程序输出到 `release/PasteBoard-Plus-Setup-0.1.4-x64.exe`，可选择安装位置并创建桌面快捷方式。便携包输出到 `release/PasteBoard-Plus-0.1.4-win-x64.zip`。解压整个 ZIP 后运行 `PasteBoard Plus.exe`。Windows 输入辅助服务使用系统自带的 Windows PowerShell / .NET Framework，无需安装开发 SDK。v0.1.4 修正了自绘输入控件未暴露 Edit / ValuePattern 时误报“未找到原输入框”的判断；仅无法获取精确光标不再阻止粘贴。粘贴前仍检查原窗口、进程及焦点身份，目标改变时拒绝发送。
 
 浏览器预览明确标注其模式：只能在点击「捕获剪贴板」时读取浏览器获准访问的文字，历史保存在此浏览器中。示例须手动载入；不会把示例加入桌面历史。系统全局快捷键、自动监听和 AI 请求由桌面版提供。
 
@@ -147,12 +149,12 @@ tests/           单元测试和浏览器端到端测试
 
 界面依赖在构建时合并，不再随运行时重复携带完整的 React、图标库及 Zod 源码；发行包不含调试 source map。Chromium 只保留中英文资源，AI 翻译仍支持原有全部目标语言。安装包仍包含离线运行所需的 Electron / Chromium，没有改成需要联网下载主体的安装器。
 
-下载目录仅保留当前版本，旧版本可从 `v0.1.1`、`v0.1.2` 标签获取。
+下载目录仅保留当前版本，旧版本可从 `v0.1.1`、`v0.1.2`、`v0.1.3` 标签获取。
 
-与 v0.1.1 的实测体积对比（v0.1.3 离线完整包，含本地词库）：
+与 v0.1.1 的实测体积对比（v0.1.4 离线完整包，含本地词库）：
 
 | 项目 | 旧版 | 新版 | 减少 |
 | --- | ---: | ---: | ---: |
 | 安装版 EXE | 155.72 MiB | 108.10 MiB | 30.6% |
 | 便携 ZIP | 151.13 MiB | 135.95 MiB | 10.0% |
-| 解压后应用 | 400.28 MiB | 312.16 MiB | 22.0% |
+| 解压后应用 | 400.28 MiB | 312.17 MiB | 22.0% |

@@ -129,3 +129,30 @@ test('Win11 popup translates with the supplied dictionary without an API and cop
   await expect(page.getByText('32,159 条六向查询记录 · 离线可用')).toBeVisible();
   await page.screenshot({ path: 'test-results/win11-settings.png', fullPage: true });
 });
+
+test('Win11 manager and settings keep the same aligned search field', async ({ page }) => {
+  await page.setViewportSize({ width: 1360, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: '管理记录', exact: true }).click();
+  await page.getByRole('button', { name: '体验示例', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '所有记录' })).toBeVisible();
+  const managerSearch = await page.getByRole('textbox', { name: '搜索历史记录' }).boundingBox();
+  await page.screenshot({ path: 'test-results/win11-manager.png' });
+  await page.getByRole('textbox', { name: '搜索历史记录' }).fill('const ideas');
+  await expect(page.getByTestId('entry-card')).toHaveCount(1);
+  await page.getByRole('button', { name: '清空搜索', exact: true }).click();
+  await page.getByRole('button', { name: /^偏好设置/ }).click();
+  const settingsSearch = page.getByRole('textbox', { name: '搜索设置' });
+  const settingsBounds = await settingsSearch.boundingBox();
+  expect(settingsBounds!.x).toBeCloseTo(managerSearch!.x, 0);
+  expect(settingsBounds!.y).toBeCloseTo(managerSearch!.y, 0);
+  expect(settingsBounds!.width).toBeCloseTo(managerSearch!.width, 0);
+  const container = await page.locator('.fluent-window-search').boundingBox();
+  const icon = await page.locator('.fluent-window-search > svg').boundingBox();
+  expect(Math.abs(settingsBounds!.y + settingsBounds!.height / 2 - container!.y - container!.height / 2)).toBeLessThan(1);
+  expect(Math.abs(icon!.y + icon!.height / 2 - container!.y - container!.height / 2)).toBeLessThan(1);
+  await settingsSearch.fill('API');
+  await expect(page.getByRole('heading', { name: '翻译与词库', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '清空设置搜索' }).click();
+  await page.screenshot({ path: 'test-results/win11-settings-aligned.png' });
+});

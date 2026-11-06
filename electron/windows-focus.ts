@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
+import { hasFocusTarget } from '../shared/focus-target';
 
 export interface FocusContext { window: string; control: string; process: number; elementKey: string; editable: boolean; caretLocated: boolean; x: number; y: number; width: number; height: number }
 export class WindowsFocus {
@@ -47,7 +48,7 @@ export class WindowsFocus {
   }
   capture(ownWindow: string) { return this.request<FocusContext>('capture', { ownWindow }); }
   paste(target: FocusContext) {
-    if (!target.editable) return Promise.resolve({ pasted: false, message: '未找到原输入框。请先点击目标输入框，再按快捷键唤出。' });
+    if (!hasFocusTarget(target)) return Promise.resolve({ pasted: false, message: '未捕获到原窗口的键盘焦点。内容已复制，请在目标输入框重新按快捷键唤出。' });
     return this.request<{ pasted: boolean; message: string }>('paste', { window: target.window, control: target.control, process: target.process, elementKey: target.elementKey });
   }
   stop() { const child = this.child; this.child = undefined; this.ready = undefined; child?.kill(); for (const item of this.pending.values()) { clearTimeout(item.timer); item.reject(new Error('Windows 输入辅助服务已停止，请重新唤出。')); } this.pending.clear(); }

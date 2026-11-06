@@ -1,0 +1,124 @@
+/* Shared Windows 11 chrome. Keep the search input independent of form-field rules. */
+.fluent-window-caption{height:56px;flex-shrink:0;display:grid;grid-template-columns:240px minmax(0,1fr) 144px;align-items:center;background:#f4f1f3;color:#202020;-webkit-app-region:drag;user-select:none;z-index:5}
+.fluent-window-label{display:flex;align-items:center;gap:16px;padding-left:17px;font-size:14px;min-width:0}
+.fluent-window-label>button{display:grid;place-items:center;width:32px;height:32px;border-radius:4px;color:#424242;-webkit-app-region:no-drag}
+.fluent-window-label>button:hover{background:#00000008}
+.fluent-window-search{width:min(600px,calc(100% - 32px));height:36px;justify-self:center;display:flex;align-items:center;gap:10px;padding:0 14px;background:#ffffffef;border-radius:20px;box-shadow:0 1px 2px #00000012,inset 0 -1px #88888855;color:#333;-webkit-app-region:no-drag;overflow:hidden}
+.fluent-window-caption .fluent-window-search input{display:block;flex:1;width:100%;min-width:0;height:34px;min-height:0;margin:0;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none!important;color:#222;font-size:14px;line-height:normal;align-self:center}
+.fluent-window-caption .fluent-window-search input::placeholder{font-size:14px;color:#696969}
+.fluent-window-search:focus-within{box-shadow:0 1px 2px #00000012,inset 0 -2px #0067c0}
+.fluent-window-search>svg{flex-shrink:0}
+.fluent-window-search>button{width:24px;height:26px;display:grid;place-items:center;border-radius:4px;color:#666}
+.fluent-window-search>button:hover{background:#00000008}
+.fluent-window-controls{height:100%;display:flex;justify-content:flex-end;align-items:stretch;-webkit-app-region:no-drag}
+.fluent-window-controls .window-actions{height:100%}
+.fluent-window-controls .window-actions button{width:46px;color:#333}
+.fluent-window-controls .window-actions button:last-child:hover{color:white;background:#c42b1c}
+.fluent-preview-tag{align-self:center;padding-right:18px;font-size:11px;color:#666}
+.fluent-settings .settings-body{max-width:none;margin:0}
+.fluent-settings-page-title{padding-bottom:23px}
+.fluent-settings-main{padding-top:20px}
+.fluent-settings button:focus-visible,.fluent-manager button:focus-visible,.fluent-manager summary:focus-visible{outline-color:#0067c0}
+
+/* Management uses the same shell, profile, navigation, and surfaces as Settings. */
+.fluent-manager{background:#f4f1f3;color:#202020;--sidebar:240px;--detail:336px;--accent:#0067c0;--muted:#666}
+.fluent-manager .workspace,.fluent-manager .main-panel{background:transparent}
+.fluent-manager .sidebar{width:var(--sidebar);padding:22px 13px 16px;background:transparent;box-shadow:none;gap:0}
+.fluent-manager .workspace-label{padding:0 7px 30px;gap:12px}
+.fluent-manager .workspace-label>img{width:46px;height:46px;border-radius:12px;flex-shrink:0}
+.fluent-manager .workspace-label strong{font-size:15px;color:#202020;margin-bottom:7px;font-weight:600}
+.fluent-manager .workspace-label span{font-size:11px;color:#666;letter-spacing:0}
+.fluent-manager .section-label{font-size:11px;letter-spacing:0;color:#777;padding-left:15px;margin-top:16px;margin-bottom:7px}
+.fluent-manager .section-label:first-child{margin-top:0}
+.fluent-manager .nav-item{height:43px;padding:0 15px;margin:2px 0;gap:13px;color:#333;border-radius:5px;font-size:14px;position:relative;font-weight:400;box-shadow:none}
+.fluent-manager .nav-item:hover{background:#00000005}
+.fluent-manager .nav-item.active{background:#eae6e9;color:#202020}
+.fluent-manager .nav-item.active:before{content:"";position:absolute;left:0;top:12px;height:18px;width:3px;background:#0067c0;border-radius:2px}
+.fluent-manager .nav-item.active .nav-icon{color:#0067c0}
+.fluent-manager .nav-item.active .nav-count{background:transparent;color:#555;font-weight:400}
+.fluent-manager .nav-count{font-size:11px;color:#777}
+.fluent-manager .empty-category{color:#666;font-size:12px;padding-left:15px}
+.fluent-manager .sidebar-bottom{margin-top:16px}
+.fluent-manager .storage-info{padding:12px 15px;background:#ffffff80;border-radius:7px;box-shadow:none}
+.fluent-manager .storage-info>span,.fluent-manager .storage-info p{color:#666;font-size:11px}
+.fluent-manager .storage-info strong{font-size:22px;color:#333}
+.fluent-manager .storage-info strong>span{font-size:14px;color:#777}
+.fluent-manager .storage-track{background:#ddd8de;height:3px;margin-block:10px}
+.fluent-manager .storage-track>div{background:#0067c0}
+.fluent-manager .sidebar-settings{font-size:14px;gap:13px;border-radius:5px;color:#333;box-shadow:none;margin-top:8px}
+.fluent-manager .sidebar-settings:hover{background:#eae6e9}
+.fluent-manager .sidebar-settings>span{font-size:11px;color:#777}
+.fluent-manager .main-heading{padding:24px 28px 0;background:transparent;box-shadow:none}
+.fluent-manager .breadcrumb{font-size:12px;color:#666;margin-bottom:11px}
+.fluent-manager .heading-row h1{font-size:28px;font-weight:600;letter-spacing:-.5px;color:#202020}
+.fluent-manager .heading-count{font-size:13px;background:#e9e5e9;color:#666;padding:3px 9px;border-radius:5px}
+.fluent-manager .heading-row p{font-size:13px;color:#696969;margin-top:10px;line-height:1.8}
+.fluent-manager .capture-button{font-size:12px;color:#333;background:white;box-shadow:0 1px 2px #00000017;border-radius:5px;height:34px;padding:0 12px}
+.fluent-manager .toolbar{margin-top:23px;padding-bottom:18px;gap:9px}
+.manager-toolbar-label{flex:1;font-size:14px;color:#333;font-weight:600}
+.manager-toolbar-label>span{font-size:12px;color:#666;font-weight:400;margin-left:5px}
+.fluent-manager .layout-switch{background:#fff;border-radius:5px;box-shadow:0 1px 2px #00000010}
+.fluent-manager .layout-switch button{color:#666;width:31px;height:31px}
+.fluent-manager .layout-switch button.active{color:#0067c0;background:#e7f0fa;box-shadow:none;border-radius:4px}
+.fluent-manager .more-menu>summary{color:#444;width:31px;height:31px;border-radius:5px;background:#fff;box-shadow:0 1px 2px #00000010}
+.fluent-manager .more-menu>div{background:#fafafa;border-radius:7px;box-shadow:0 4px 20px #00000022}
+.fluent-manager .more-menu button{font-size:13px;color:#333;padding:10px}
+.fluent-manager .records-scroll{padding:0 28px}
+.fluent-manager .records-subheading{padding-top:13px;font-size:12px;color:#666}
+.fluent-manager .sort-control,.fluent-manager .sort-control select{font-size:12px;color:#666}
+.fluent-manager .entries.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.fluent-manager .entry-card{background:#ffffffdd;border-radius:7px;box-shadow:0 1px 2px #00000015;transition:background .15s,box-shadow .15s}
+.fluent-manager .entry-card:hover{background:white;box-shadow:0 2px 6px #0000001a}
+.fluent-manager .entry-card.selected{background:#f8fbff;box-shadow:inset 3px 0 #0067c0,0 1px 3px #0000001a}
+.fluent-manager .card-heading h3{font-size:14px;font-weight:600;color:#202020}
+.fluent-manager .text-preview,.fluent-manager .url-preview,.fluent-manager .path-preview p{font-size:13px;line-height:1.8;color:#555}
+.fluent-manager .card-footer{font-size:11px;color:#777;background:#ffffff55}
+.fluent-manager .card-time{font-size:10px;color:#777}
+.fluent-manager .card-pin,.fluent-manager .card-copy{color:#666}
+.fluent-manager .card-pin.is-pinned{color:#0067c0}
+.fluent-manager .card-category{background:#edf2f9;color:#4f6d8a}
+.fluent-manager .type-icon{background:#eef3f9;color:#477496}
+.fluent-manager .browser-banner{margin-inline:28px;background:#e9edf3;color:#525f6c;font-size:11px;border-radius:5px;padding:10px 12px}
+.fluent-manager .browser-banner button{color:#0067c0}
+.fluent-manager .main-status{background:transparent;box-shadow:none;font-size:11px;padding-inline:28px;color:#666}
+.fluent-manager .capture-status,.fluent-manager .status-shortcut{color:#666;font-size:11px}
+.fluent-manager .capture-status.enabled{color:#476b58}
+.fluent-manager .records-end{font-size:11px;color:#888}
+.fluent-manager .detail-panel{margin:22px 24px 20px 0;background:#ffffffb8;border-radius:9px;box-shadow:0 1px 2px #0000000c;overflow:hidden;width:var(--detail)}
+.fluent-manager .detail-heading{font-size:13px;color:#333;border-bottom:1px solid #00000008}
+.fluent-manager .detail-label{font-size:10px;color:#777;letter-spacing:0}
+.fluent-manager .detail-intro h2{font-size:15px;color:#222}
+.fluent-manager .detail-intro>div:nth-child(2)>span{font-size:11px;color:#777}
+.fluent-manager .detail-tabs button{font-size:13px;color:#666}
+.fluent-manager .detail-tabs button.active{color:#0067c0}
+.fluent-manager .detail-tabs button.active:after{background:#0067c0}
+.fluent-manager .original-text,.fluent-manager .translated-text{font-size:14px;line-height:1.9;color:#333}
+.fluent-manager .entry-metadata{background:#f7f6f7;border-radius:6px;padding:12px;color:#666}
+.fluent-manager .entry-metadata>div{font-size:11px;color:#666}
+.fluent-manager .entry-metadata select{font-size:11px;color:#333;background:white}
+.fluent-manager .ai-box{background:#f2f5fa;border-radius:7px;box-shadow:0 1px 2px #00000008}
+.fluent-manager .ai-box-heading{font-size:13px;color:#333}
+.fluent-manager .language-row,.fluent-manager .language-row select{font-size:12px;color:#555}
+.fluent-manager .translate-button{color:white;background:#0067c0;font-size:13px;border-radius:5px}
+.fluent-manager .ai-box>p{font-size:10px;color:#666}
+.fluent-manager .detail-actions{background:#fff9;box-shadow:0 -1px #00000007}
+.fluent-manager .button.primary{background:#0067c0;color:white;box-shadow:0 1px 2px #00000015;border-radius:5px}
+.fluent-manager .detail-actions>p{font-size:11px;color:#666}
+.fluent-manager .empty-state h2{font-size:19px;color:#333}
+.fluent-manager .empty-state p{font-size:13px;color:#666}
+.fluent-manager .empty-state .eyebrow{color:#777}
+.fluent-manager .empty-shortcut{color:#666;font-size:12px}
+.fluent-manager .detail-empty h3{color:#444;font-size:14px}
+.fluent-manager .detail-empty p{color:#777;font-size:12px}
+.fluent-manager .detail-empty-feature{color:#647a6d;font-size:11px}
+.fluent-manager .modal{background:#faf8fa;color:#222;border-radius:9px}
+.fluent-manager .modal-heading h2{color:#222}.fluent-manager .modal-heading p{color:#666}
+.fluent-manager .modal-footer{background:#f4f1f3}
+.fluent-manager .field-label,.fluent-manager .checkbox-label{font-size:13px;color:#444}
+.fluent-manager .modal input:not([type=checkbox]){background:white;color:#333;box-shadow:0 1px 2px #00000020;font-size:14px}
+.fluent-manager .modal input:focus{box-shadow:0 1px 0 1px #0067c0}
+@media(min-width:1650px){.fluent-manager .entries.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1100px){.fluent-manager{--detail:292px}.fluent-manager .main-heading{padding-inline:20px}.fluent-manager .records-scroll{padding-inline:20px}.fluent-manager .detail-panel{margin-right:18px}.fluent-manager .browser-banner{margin-inline:20px}.fluent-manager .heading-row p{max-width:250px;font-size:12px}}
+@media(max-width:900px){.fluent-manager .detail-panel{display:none}.fluent-manager .detail-panel.mobile-open{display:flex;position:fixed;top:56px;right:0;bottom:0;margin:0;width:min(350px,calc(100vw - 20px));border-radius:9px 0 0 0;background:#faf8fa;box-shadow:-8px 0 40px #00000020}.fluent-manager .heading-row p{max-width:none}}
+@media(max-width:800px){.fluent-window-caption{grid-template-columns:180px minmax(0,1fr) 120px}.fluent-manager{--sidebar:180px}.fluent-manager .sidebar{padding-inline:9px}.fluent-manager .workspace-label{gap:8px;padding-inline:3px}.fluent-manager .workspace-label>img{width:35px;height:35px}.fluent-manager .workspace-label strong{font-size:13px}.fluent-manager .workspace-label span{font-size:10px}.fluent-manager .nav-item{font-size:13px;padding-inline:11px;gap:10px}.fluent-window-controls .window-actions button{width:39px}}
+@media(max-width:570px){.fluent-window-caption{height:48px;grid-template-columns:96px minmax(0,1fr) 8px}.fluent-window-label{padding-left:7px;gap:4px;font-size:12px}.fluent-window-label>button{width:28px}.fluent-window-search{width:calc(100% - 8px);height:32px;padding-inline:10px;gap:7px}.fluent-window-caption .fluent-window-search input{height:30px;font-size:12px}.fluent-window-caption .fluent-window-search input::placeholder{font-size:12px}.fluent-window-controls{display:none}.fluent-manager{--sidebar:52px;min-height:0}.fluent-manager .sidebar{padding:18px 5px 0}.fluent-manager .workspace-label,.fluent-manager .section-label,.fluent-manager .storage-info,.fluent-manager .sidebar-settings>span,.fluent-manager .empty-category{display:none}.fluent-manager .nav-item{padding:0;justify-content:center;height:40px;margin-bottom:7px}.fluent-manager .nav-item>span:not(.nav-icon){display:none}.fluent-manager .nav-item.active:before{top:11px}.fluent-manager .sidebar-settings{padding:0;justify-content:center}.fluent-manager .main-heading{padding:18px 14px 0}.fluent-manager .breadcrumb{font-size:10px;margin-bottom:8px}.fluent-manager .heading-row h1{font-size:22px}.fluent-manager .heading-row p{font-size:11px;margin-top:8px}.fluent-manager .capture-button{font-size:10px;padding-inline:8px;gap:5px;flex-shrink:0}.fluent-manager .toolbar{margin-top:16px;padding-bottom:13px;gap:7px}.manager-toolbar-label{font-size:12px}.manager-toolbar-label>span{font-size:10px}.fluent-manager .records-scroll{padding-inline:14px}.fluent-manager .entries.grid{grid-template-columns:1fr;gap:12px}.fluent-manager .browser-banner{margin-inline:14px;font-size:10px;line-height:1.7}.fluent-manager .main-status{padding-inline:14px;font-size:10px}.fluent-manager .capture-status{font-size:10px}.fluent-manager .detail-panel.mobile-open{top:48px}.fluent-manager .card-footer{font-size:10px}.fluent-manager .card-heading h3{font-size:14px}.fluent-manager .empty-state h2{font-size:17px}.fluent-manager .empty-state p{font-size:12px}}

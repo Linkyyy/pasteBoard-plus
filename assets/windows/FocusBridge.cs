@@ -62,9 +62,9 @@ namespace PasteBoardNative {
         if (element == null || element.Current.ProcessId != result.process) return result;
         result.elementKey = string.Join("-", element.GetRuntimeId());
         object pattern;
-        if (element.TryGetCurrentPattern(ValuePattern.Pattern, out pattern)) result.editable = !((ValuePattern)pattern).Current.IsReadOnly;
+        if (element.TryGetCurrentPattern(ValuePattern.Pattern, out pattern)) result.editable = result.editable || !((ValuePattern)pattern).Current.IsReadOnly;
         if (element.Current.ControlType == ControlType.Edit) result.editable = true;
-        if (result.editable && !result.caretLocated && element.TryGetCurrentPattern(TextPattern.Pattern, out pattern)) {
+        if (!result.caretLocated && element.TryGetCurrentPattern(TextPattern.Pattern, out pattern)) {
           var textPattern = (TextPattern)pattern;
           var selection = textPattern.GetSelection();
           if (selection != null && selection.Length > 0) {

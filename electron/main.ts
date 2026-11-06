@@ -7,6 +7,7 @@ import { idSchema, languageSchema, settingsSchema } from './schema';
 import { TranslationService } from './translation-service';
 import { WindowsFocus, type FocusContext } from './windows-focus';
 import { popupPosition } from '../shared/popup-position';
+import { hasFocusTarget } from '../shared/focus-target';
 import type { Snapshot } from '../shared/types';
 import { classify } from '../shared/classify';
 
@@ -46,7 +47,7 @@ function canSecurelyStoreKey() {
 function snapshot(): Snapshot {
   return { windowMode, entries: store.entries, categories: store.categories, settings: store.settings,
     hasApiKey: Boolean(apiKey), keyStorage: canSecurelyStoreKey() ? 'secure' : 'session',
-    shortcutRegistered, warning: captureWarning || store.warning, insertion: { supported: process.platform === 'win32' && !focusError, hasTarget: Boolean(focusTarget?.editable), caretLocated: Boolean(focusTarget?.caretLocated), message: focusError } };
+    shortcutRegistered, warning: captureWarning || store.warning, insertion: { supported: process.platform === 'win32' && !focusError, hasTarget: hasFocusTarget(focusTarget), caretLocated: Boolean(focusTarget?.caretLocated), message: focusError } };
 }
 function broadcast() {
   if (window && !window.isDestroyed()) window.webContents.send('pasteboard:changed', snapshot());
@@ -95,9 +96,19 @@ async function openCompact() {
   const generation = ++opening;
   openingPending = true;
   focusTarget = null; focusError = null;
+  if (process.platform === 'win32' && windowMode === 'manager' && window?.isVisible()) {
+    window.hide();
+    await new Promise(resolve => setTimeout(resolve, 75));
+    if (generation !== opening) return;
+  }
   if (focusService && window) {
     try {
-      const target = await focusService.capture(ownWindowHandle());
+      let target = await focusService.capture(ownWindowHandle());
+      if (!hasFocusTarget(target)) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (generation !== opening) return;
+        target = await focusService.capture(ownWindowHandle());
+      }
       if (generation !== opening) return;
       focusTarget = target;
     } catch (error) { focusError = error instanceof Error ? error.message : '无法读取输入光标。'; }
@@ -339,7 +350,7 @@ else {
     void poll(); timer = setInterval(() => void poll(), 800);
     let following = false;
     focusTimer = setInterval(async () => {
-      if (following || pasting || openingPending || windowMode !== 'compact' || !window?.isVisible() || !focusService || !focusTarget?.editable) return;
+      if (following || pasting || openingPending || windowMode !== 'compact' || !window?.isVisible() || !focusService || !focusTarget || !hasFocusTarget(focusTarget)) return;
       following = true;
       const previous = focusTarget;
       try {
