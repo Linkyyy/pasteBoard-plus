@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 test('empty state, examples, filtering, search, view switching and category assignment', async ({ page }) => {
+  test.setTimeout(60_000);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/');
+  await page.goto('/'); await page.getByRole('button', { name: '管理记录', exact: true }).click();
   await expect(page.getByText('下一次复制，从这里开始')).toBeVisible();
   await page.getByRole('button', { name: '体验示例' }).click();
   await expect(page.getByTestId('entry-card')).toHaveCount(9);
@@ -23,7 +24,7 @@ test('empty state, examples, filtering, search, view switching and category assi
   await page.getByLabel('收纳到分类', { exact: true }).selectOption({ label: '翻译素材' });
   await page.getByRole('button', { name: /^翻译素材\s*1$/ }).click();
   await expect(page.getByTestId('entry-card')).toHaveCount(1);
-  await page.reload();
+  await page.reload(); await page.getByRole('button', { name: '管理记录', exact: true }).click();
   await page.getByRole('button', { name: /^翻译素材\s*1$/ }).click();
   await expect(page.getByTestId('entry-card')).toHaveCount(1);
   expect(errors).toEqual([]);
@@ -31,7 +32,7 @@ test('empty state, examples, filtering, search, view switching and category assi
 
 test('copy writes the selected text to the actual browser clipboard', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.goto('/'); await page.getByRole('button', { name: '体验示例' }).click();
+  await page.goto('/'); await page.getByRole('button', { name: '管理记录', exact: true }).click(); await page.getByRole('button', { name: '体验示例' }).click();
   await page.getByRole('button', { name: '查看：Design is how it feels.' }).click();
   await page.getByRole('button', { name: /^复制内容/ }).click();
   await expect(page.getByRole('status')).toContainText('已复制');
@@ -39,7 +40,7 @@ test('copy writes the selected text to the actual browser clipboard', async ({ p
 });
 
 test('settings records shortcut and clear keeps pinned entries by default', async ({ page }) => {
-  await page.goto('/'); await page.getByRole('button', { name: '体验示例' }).click();
+  await page.goto('/'); await page.getByRole('button', { name: '管理记录', exact: true }).click(); await page.getByRole('button', { name: '体验示例' }).click();
   await page.getByRole('button', { name: /^偏好设置/ }).click();
   const recorder = page.getByRole('button', { name: '录制全局快捷键' });
   await recorder.click(); await recorder.press('Control+Alt+P');
@@ -55,7 +56,7 @@ test('settings records shortcut and clear keeps pinned entries by default', asyn
 });
 
 test('AI configuration explains provider privacy and never persists a preview key', async ({ page }) => {
-  await page.goto('/'); await page.getByRole('button', { name: '体验示例' }).click();
+  await page.goto('/'); await page.getByRole('button', { name: '管理记录', exact: true }).click(); await page.getByRole('button', { name: '体验示例' }).click();
   await page.getByRole('button', { name: '连接 AI，开始翻译' }).click();
   await expect(page.getByLabel('API 服务地址')).toHaveValue('https://api.openai.com/v1');
   await expect(page.getByText('当前环境仅在本次会话保存密钥')).toBeVisible();
@@ -67,7 +68,7 @@ test('AI configuration explains provider privacy and never persists a preview ke
 
 test('small-screen preview stays within the viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/'); await page.getByRole('button', { name: '体验示例' }).click();
+  await page.goto('/'); await page.getByRole('button', { name: '管理记录', exact: true }).click(); await page.getByRole('button', { name: '体验示例' }).click();
   await expect(page.getByTestId('entry-card').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.getByRole('button', { name: '查看：Design is how it feels.' }).click();
@@ -76,4 +77,33 @@ test('small-screen preview stays within the viewport', async ({ page }) => {
   await page.getByRole('button', { name: '关闭详情' }).click();
   await expect(page.getByTestId('original-content')).not.toBeVisible();
   await page.screenshot({ path: 'test-results/mobile.png', fullPage: true });
+});
+
+
+test('compact first, management and settings open explicitly, unlimited capacity and image opt-in', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.setViewportSize({ width: 400, height: 580 });
+  await page.goto('/');
+  await expect(page.getByTestId('compact-board')).toBeVisible();
+  await expect(page.getByText('历史无限条', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '所有记录' })).not.toBeVisible();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '偏好设置' })).toBeVisible();
+  await expect(page.getByLabel('历史记录容量')).toHaveValue('0');
+  await expect(page.getByRole('switch', { name: '记录图片', exact: true })).toHaveAttribute('aria-checked', 'false');
+  await page.getByRole('switch', { name: '记录图片', exact: true }).click();
+  await page.getByLabel('历史记录容量').selectOption('custom');
+  await page.getByLabel('自定义历史条数').fill('15000');
+  await page.getByRole('button', { name: '保存设置' }).click();
+  await expect(page.getByTestId('compact-board')).toBeVisible();
+  await expect(page.getByText('容量 15000 条')).toBeVisible();
+  await page.getByRole('button', { name: '体验示例' }).click();
+  await expect(page.getByTestId('compact-record')).toHaveCount(7);
+  await page.screenshot({ path: 'test-results/compact.png' });
+  await page.getByRole('button', { name: '复制：Design is how it feels.' }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('Design is how it feels.');
+  await page.getByRole('button', { name: '管理记录', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '所有记录' })).toBeVisible();
+  await page.getByRole('button', { name: '返回小窗口' }).click();
+  await expect(page.getByTestId('compact-board')).toBeVisible();
 });

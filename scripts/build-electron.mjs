@@ -2,7 +2,7 @@ import { build } from 'esbuild';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { deflateSync } from 'node:zlib';
 
-await build({ entryPoints: ['electron/main.ts'], outfile: 'dist-electron/main.cjs', bundle: true, platform: 'node', target: 'node24', format: 'cjs', external: ['electron', 'undici'], sourcemap: true });
+await build({ entryPoints: ['electron/main.ts'], outfile: 'dist-electron/main.cjs', bundle: true, platform: 'node', target: 'node24', format: 'cjs', external: ['electron', 'undici'], minify: true });
 await build({ entryPoints: ['electron/preload.ts'], outfile: 'dist-electron/preload.cjs', bundle: true, platform: 'node', target: 'node24', format: 'cjs', external: ['electron'] });
 
 // A tiny, dependency-free PNG icon, also suitable for the system tray.

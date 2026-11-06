@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ClipboardItem, globalShortcut, ipcMain, Menu, nativeImage, safeStorage, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem, globalShortcut, ipcMain, Menu, nativeImage, safeStorage, screen, Tray } from 'electron';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -6,6 +6,7 @@ import { HistoryStore } from './store';
 import { idSchema, languageSchema, settingsSchema } from './schema';
 import { translateText } from './translate';
 import type { Snapshot } from '../shared/types';
+import { classify } from '../shared/classify';
 
 if (process.env.PASTEBOARD_USER_DATA) app.setPath('userData', process.env.PASTEBOARD_USER_DATA);
 if (process.env.PASTEBOARD_DISABLE_GPU === '1') app.disableHardwareAcceleration();
@@ -19,6 +20,7 @@ let quitting = false;
 let lastFingerprint = '';
 let timer: ReturnType<typeof setInterval> | undefined;
 let captureWarning: string | null = null;
+let windowMode: Snapshot['windowMode'] = 'compact';
 const pendingTranslations = new Map<string, Promise<unknown>>();
 let clipboardQueue: Promise<unknown> = Promise.resolve();
 function withClipboard<T>(action: () => Promise<T>): Promise<T> {
@@ -32,7 +34,7 @@ function canSecurelyStoreKey() {
     && !(process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text');
 }
 function snapshot(): Snapshot {
-  return { entries: store.entries, categories: store.categories, settings: store.settings,
+  return { windowMode, entries: store.entries, categories: store.categories, settings: store.settings,
     hasApiKey: Boolean(apiKey), keyStorage: canSecurelyStoreKey() ? 'secure' : 'session',
     shortcutRegistered, warning: captureWarning || store.warning };
 }
@@ -45,10 +47,26 @@ function showWindow() {
   if (window.isMinimized()) window.restore();
   window.show(); window.focus();
 }
-function toggleWindow() { if (window?.isVisible() && window.isFocused()) window.hide(); else showWindow(); }
+function setWindowMode(mode: Snapshot['windowMode']) {
+  if (!window) return;
+  windowMode = mode;
+  if (window.isMaximized()) window.unmaximize();
+  window.setMinimumSize(mode === 'compact' ? 320 : 1060, mode === 'compact' ? 380 : 720);
+  window.setResizable(mode === 'manager');
+  window.setMaximizable(mode === 'manager');
+  window.setAlwaysOnTop(mode === 'compact');
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const width = Math.min(mode === 'compact' ? 400 : 1360, area.width);
+  const height = Math.min(mode === 'compact' ? 580 : 900, area.height);
+  window.setBounds({ width, height, x: area.x + Math.round((area.width - width) / 2), y: area.y + Math.round((area.height - height) / 2) });
+  broadcast();
+}
+function openCompact() { setWindowMode('compact'); showWindow(); }
+function toggleWindow() { if (window?.isVisible() && window.isFocused() && windowMode === 'compact') window.hide(); else openCompact(); }
 function updateTray() {
   tray?.setContextMenu(Menu.buildFromTemplate([
-    { label: '打开 PasteBoard Plus', click: showWindow },
+    { label: '打开剪贴板', click: openCompact },
+    { label: '管理记录', click: () => { setWindowMode('manager'); showWindow(); } },
     { label: store.settings.captureEnabled ? '暂停记录' : '继续记录', click: () => { store.updateSettings({ ...store.settings, captureEnabled: !store.settings.captureEnabled }); broadcast(); } },
     { type: 'separator' }, { label: '退出', click: () => app.quit() },
   ]));
@@ -88,14 +106,18 @@ async function capture(manual = false) {
   const historyHint = await readBlob(items, 'electron application/osclipboard;format="CanIncludeInClipboardHistory"');
   const excluded = historyHint && Buffer.from(await historyHint.arrayBuffer()).every(byte => byte === 0);
   if (sensitive || excluded) return { captured: false, message: '已跳过被应用标记为敏感的内容' };
+  if (formats.some(format => /CF_HDROP|FileName[AW]?|FileGroupDescriptor|FileContents|NSFilenamesPboardType|public\.file-url|application\/x-moz-file/i.test(format))) return { captured: false, message: '文件剪贴板内容不记录' };
   const textBlob = await readBlob(items, 'text/plain');
-  const text = await readFilePaths(items) || (textBlob ? await textBlob.text() : '');
+  if (await readFilePaths(items)) return { captured: false, message: '文件剪贴板内容不记录' };
+  const text = textBlob ? await textBlob.text() : '';
   if (text.trim()) {
+    if (classify(text) === 'path') return { captured: false, message: '文件路径不记录' };
     const fingerprint = createHash('sha256').update(text).digest('hex');
     if (fingerprint === lastFingerprint && !manual) return { captured: false, message: '剪贴板没有变化' };
     if (text.length > 100_000) { lastFingerprint = fingerprint; throw new Error('这段文字超过 100,000 字，未保存。'); }
     store.addText(text); lastFingerprint = fingerprint;
   } else {
+    if (!store.settings.captureImages) return { captured: false, message: '图片记录未开启，可在设置中开启' };
     if (!formats.some(format => /image|bitmap|png|tiff|dib/i.test(format))) return { captured: false, message: '剪贴板中没有可保存的文字或图片' };
     const imageFormat = formats.find(format => format.startsWith('image/'));
     if (!imageFormat) return { captured: false, message: '剪贴板没有可识别的图片' };
@@ -128,6 +150,7 @@ function handle(channel: string, handler: (...args: any[]) => unknown) {
 }
 function registerHandlers() {
   handle('snapshot', snapshot);
+  handle('window-mode', rawMode => { setWindowMode(z.enum(['compact', 'manager']).parse(rawMode)); showWindow(); });
   handle('capture', () => withClipboard(() => capture(true)));
   handle('copy', (rawId, rawHide) => withClipboard(async () => {
     const id = idSchema.parse(rawId); const hide = z.boolean().parse(rawHide);
@@ -185,7 +208,7 @@ function registerHandlers() {
   handle('window', rawAction => {
     switch (z.enum(['minimize', 'maximize', 'hide', 'quit']).parse(rawAction)) {
       case 'minimize': window?.minimize(); break;
-      case 'maximize': if (window?.isMaximized()) window.unmaximize(); else window?.maximize(); break;
+      case 'maximize': if (windowMode === 'manager') { if (window?.isMaximized()) window.unmaximize(); else window?.maximize(); } break;
       case 'hide': window?.hide(); break;
       case 'quit': app.quit(); break;
     }
@@ -194,7 +217,8 @@ function registerHandlers() {
 
 async function createWindow() {
   window = new BrowserWindow({
-    width: 1440, height: 940, minWidth: 1060, minHeight: 720, frame: false,
+    width: 400, height: 580, minWidth: 320, minHeight: 380, frame: false,
+    resizable: false, maximizable: false, alwaysOnTop: true, hasShadow: true,
     title: 'PasteBoard Plus', backgroundColor: '#f7f8fa', icon: join(app.getAppPath(), 'assets/icon.png'),
     show: false,
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true },
@@ -211,8 +235,8 @@ async function createWindow() {
 
 if (!hasLock) app.quit();
 else {
-  app.on('second-instance', showWindow);
-  app.on('activate', showWindow);
+  app.on('second-instance', openCompact);
+  app.on('activate', openCompact);
   app.on('before-quit', () => { quitting = true; if (timer) clearInterval(timer); globalShortcut.unregisterAll(); tray?.destroy(); });
   void app.whenReady().then(async () => {
     app.setAppUserModelId('com.pasteboard.plus');

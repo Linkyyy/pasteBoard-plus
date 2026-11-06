@@ -21,5 +21,6 @@ const bridge: ClipboardBridge = {
   assignCategory: (id, categoryId) => invoke('assign-category', id, categoryId),
   saveSettings: settings => invoke('settings', settings), translate: (id, language) => invoke('translate', id, language),
   getImage: id => invoke('image', id), windowAction: action => invoke('window', action),
+  setWindowMode: mode => invoke('window-mode', mode),
 };
 contextBridge.exposeInMainWorld('pasteboard', bridge);

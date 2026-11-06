@@ -15,7 +15,7 @@ const entrySchema = z.object({
   hash: z.string(),
 });
 const dataSchema = z.object({
-  version: z.literal(1), entries: z.array(entrySchema).max(1200),
+  version: z.literal(1), entries: z.array(entrySchema),
   categories: z.array(z.object({ id: z.string().uuid(), name: z.string().min(1).max(24), color: z.string() })).max(30),
   settings: settingsSchema.omit({ apiKey: true, clearApiKey: true }), encryptedKey: z.string().max(20_000).optional(),
 });
@@ -34,7 +34,12 @@ export class HistoryStore {
     this.file = join(directory, 'history.json');
     this.data = { version: 1, entries: [], categories: [], settings: { ...DEFAULT_SETTINGS } };
     if (existsSync(this.file)) {
-      try { this.data = dataSchema.parse(JSON.parse(readFileSync(this.file, 'utf8'))); }
+      try {
+        const raw = JSON.parse(readFileSync(this.file, 'utf8'));
+        // Upgrade the old default while preserving explicitly chosen capacities.
+        if (raw.settings && raw.settings.captureImages === undefined && raw.settings.historyLimit === 300) raw.settings.historyLimit = 0;
+        this.data = dataSchema.parse(raw);
+      }
       catch {
         // Preserve unreadable data instead of overwriting it with an empty history.
         const backup = `${this.file}.recovery-${Date.now()}`;
@@ -85,6 +90,7 @@ export class HistoryStore {
     }
   }
   private prune() {
+    if (this.data.settings.historyLimit === 0) return;
     let count = 0;
     this.data.entries = this.data.entries.filter(entry => {
       const keep = entry.pinned || ++count <= this.data.settings.historyLimit;
@@ -94,7 +100,6 @@ export class HistoryStore {
   }
   togglePin(id: string) {
     const entry = this.require(id);
-    if (!entry.pinned && this.data.entries.filter(item => item.pinned).length >= 100) throw new Error('最多置顶 100 条记录。');
     entry.pinned = !entry.pinned; this.prune(); this.save();
   }
   recordCopy(id: string) { this.require(id).copyCount++; this.save(); }

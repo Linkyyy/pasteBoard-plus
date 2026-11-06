@@ -1,7 +1,7 @@
 {
   "name": "pasteboard-plus",
   "productName": "PasteBoard Plus",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A thoughtful clipboard companion with collections and AI translation.",
   "author": "PasteBoard Plus",
   "license": "MIT",
@@ -17,17 +17,14 @@
     "test:e2e": "playwright test",
     "test:desktop": "node scripts/smoke-desktop.mjs",
     "test:desktop:headless": "node scripts/with-display.mjs -- npm run test:desktop",
+    "verify:package": "node scripts/check-package.mjs",
     "start": "electron .",
     "start:cloud": "node scripts/with-display.mjs -- npx --no electron . --no-sandbox",
     "pack": "npm run build && electron-builder --dir",
     "dist:win": "npm run build && electron-builder --win nsis --x64 && electron-builder --win zip --x64 --prepackaged release/win-unpacked"
   },
   "dependencies": {
-    "lucide-react": "1.68.0",
-    "react": "19.3.1",
-    "react-dom": "19.3.1",
-    "undici": "8.12.3",
-    "zod": "4.6.7"
+    "undici": "8.12.3"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
@@ -38,9 +35,13 @@
     "electron": "45.2.3",
     "electron-builder": "26.18.0",
     "esbuild": "0.28.2",
+    "lucide-react": "1.68.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "typescript": "5.9.3",
     "vite": "8.3.6",
-    "vitest": "5.1.0"
+    "vitest": "5.1.0",
+    "zod": "4.6.7"
   },
   "build": {
     "appId": "com.pasteboard.plus",
@@ -51,10 +52,12 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "!dist-electron/**/*.map",
       "assets/**/*",
       "package.json"
     ],
     "asar": true,
+    "electronLanguages": ["zh-CN", "en-US"],
     "win": {
       "target": [
         "nsis",
@@ -65,7 +68,10 @@
     },
     "nsis": {
       "script": "scripts/installer.nsi",
-      "installerLanguages": ["zh_CN", "en_US"],
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

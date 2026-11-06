@@ -22,12 +22,14 @@ export interface Settings {
   shortcut: string;
   historyLimit: number;
   captureEnabled: boolean;
+  captureImages: boolean;
   apiEndpoint: string;
   apiModel: string;
   targetLanguage: Language;
 }
 export interface SettingsInput extends Settings { apiKey?: string; clearApiKey?: boolean }
 export interface Snapshot {
+  windowMode: 'compact' | 'manager';
   entries: ClipboardEntry[];
   categories: Category[];
   settings: Settings;
@@ -54,9 +56,10 @@ export interface ClipboardBridge {
   translate(id: string, language: Language): Promise<Translation>;
   getImage(id: string): Promise<string>;
   windowAction(action: 'minimize' | 'maximize' | 'hide' | 'quit'): Promise<void>;
+  setWindowMode(mode: 'compact' | 'manager'): Promise<void>;
   loadExamples?(): Promise<void>;
 }
 export const DEFAULT_SETTINGS: Settings = {
-  shortcut: 'CommandOrControl+Shift+V', historyLimit: 300, captureEnabled: true,
+  shortcut: 'CommandOrControl+Shift+V', historyLimit: 0, captureEnabled: true, captureImages: false,
   apiEndpoint: 'https://api.openai.com/v1', apiModel: 'gpt-4o-mini', targetLanguage: 'zh-CN',
 };

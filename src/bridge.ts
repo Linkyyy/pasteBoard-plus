@@ -5,7 +5,7 @@ declare global { interface Window { pasteboard?: ClipboardBridge } }
 
 function createBrowserBridge(): ClipboardBridge {
   const key = 'pasteboard-plus-preview-v1';
-  let state: Snapshot = { entries: [], categories: [], settings: { ...DEFAULT_SETTINGS }, hasApiKey: false, keyStorage: 'session', shortcutRegistered: false, warning: null };
+  let state: Snapshot = { windowMode: 'compact', entries: [], categories: [], settings: { ...DEFAULT_SETTINGS }, hasApiKey: false, keyStorage: 'session', shortcutRegistered: false, warning: null };
   try {
     const saved = localStorage.getItem(key);
     if (saved) {
@@ -22,12 +22,13 @@ function createBrowserBridge(): ClipboardBridge {
   const requireEntry = (id: string) => { const entry = state.entries.find(entry => entry.id === id); if (!entry) throw new Error('记录不存在。'); return entry; };
   const addText = (content: string) => {
     if (!content.trim()) return false;
+    if (classify(content) === 'path') return false;
     if (content.length > 100_000) throw new Error('这段文字超过 100,000 字，未保存。');
     const existing = state.entries.find(entry => entry.content === content && entry.kind !== 'image');
     if (existing) { existing.updatedAt = Date.now(); state.entries = [existing, ...state.entries.filter(entry => entry.id !== existing.id)]; }
     else state.entries.unshift({ id: crypto.randomUUID(), content, kind: classify(content), createdAt: Date.now(), updatedAt: Date.now(), pinned: false, categoryId: null, copyCount: 0 });
     let count = 0;
-    state.entries = state.entries.filter(entry => entry.pinned || ++count <= state.settings.historyLimit);
+    if (state.settings.historyLimit !== 0) state.entries = state.entries.filter(entry => entry.pinned || ++count <= state.settings.historyLimit);
     changed(); return true;
   };
   return {
@@ -65,6 +66,7 @@ function createBrowserBridge(): ClipboardBridge {
     async translate() { throw new Error('请在桌面版中配置 AI API 后使用翻译。浏览器预览不会发送内容。'); },
     async getImage(id) { return requireEntry(id).image?.thumbnail || ''; },
     async windowAction() { /* No operating system window in the browser preview. */ },
+    async setWindowMode(mode) { state.windowMode = mode; changed(); },
     async loadExamples() {
       if (state.entries.length) throw new Error('请先清空预览历史，再载入示例。');
       const categoryId = crypto.randomUUID();

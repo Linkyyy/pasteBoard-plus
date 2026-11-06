@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AlignLeft, ArrowDownUp, ArrowLeft, ArrowRight, Check, CheckCheck, ChevronDown, ChevronRight, Clipboard, ClipboardCheck, Code2, Copy, Folder, FolderOpen, Globe2, Image as ImageIcon, Keyboard, LayoutGrid, List, LoaderCircle, Maximize2, Minus, MoreHorizontal, Pause, Pin, Play, Plus, Search, Settings2, ShieldCheck, Sparkles, Tag, Trash2, X } from 'lucide-react';
 import { bridge } from './bridge';
+import CompactBoard from './CompactBoard';
 import { titleOf } from '../shared/classify';
 import { DEFAULT_SETTINGS, LANGUAGES, type ClipboardEntry, type ContentKind, type Language, type SettingsInput, type Snapshot } from '../shared/types';
 
 const kindLabels: Record<ContentKind, string> = { text: '文本', image: '图片', url: '链接', path: '文件路径', code: '代码' };
 const kindIcons = { text: AlignLeft, image: ImageIcon, url: Globe2, path: FolderOpen, code: Code2 };
-const initial: Snapshot = { entries: [], categories: [], settings: DEFAULT_SETTINGS, hasApiKey: false, keyStorage: 'session', shortcutRegistered: false, warning: null };
+const initial: Snapshot = { windowMode: 'compact', entries: [], categories: [], settings: DEFAULT_SETTINGS, hasApiKey: false, keyStorage: 'session', shortcutRegistered: false, warning: null };
 type Toast = { message: string; error?: boolean };
 
 function relativeTime(time: number) {
@@ -58,6 +59,7 @@ function SettingsModal({ snapshot, initialTab, onClose, onSaved }: { snapshot: S
   const [tab, setTab] = useState(initialTab);
   const [input, setInput] = useState<SettingsInput>({ ...snapshot.settings });
   const [recording, setRecording] = useState(false);
+  const [customCapacity, setCustomCapacity] = useState(![0,50,100,300,500,1000,10000,100000].includes(snapshot.settings.historyLimit));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   async function save() {
@@ -82,8 +84,10 @@ function SettingsModal({ snapshot, initialTab, onClose, onSaved }: { snapshot: S
       }} aria-label="录制全局快捷键"><Shortcut value={input.shortcut} /><span>{recording ? '请按下新的组合键…' : '点击修改'}<Keyboard size={16} /></span></button>
       <p className="field-help">Windows + V 由系统占用，建议使用 Ctrl + Shift + V。快捷键冲突时会提示更换。</p>
       {!bridge.isDesktop && <div className="inline-note"><Globe2 size={16} /> 浏览器预览不注册系统快捷键；桌面版支持全局唤出和自动记录。</div>}
-      <div className="field-row"><div><label htmlFor="history-limit" className="field-label">历史记录容量</label><p className="field-help">超出容量时移除最旧记录，置顶记录会保留。</p></div><select id="history-limit" value={input.historyLimit} onChange={event => setInput({ ...input, historyLimit: Number(event.target.value) })}>{[50,100,300,500,1000].map(n => <option key={n} value={n}>{n} 条</option>)}</select></div>
+      <div className="field-row"><div><label htmlFor="history-limit" className="field-label">历史记录容量</label><p className="field-help">默认无限条；自定义为 0 表示不限制。有限容量下会保留置顶。</p></div><div className="capacity-controls"><select id="history-limit" value={customCapacity ? 'custom' : input.historyLimit} onChange={event => { const custom = event.target.value === 'custom'; setCustomCapacity(custom); if (!custom) setInput({ ...input, historyLimit: Number(event.target.value) }); }}>{[0,50,100,300,500,1000,10000,100000].map(n => <option key={n} value={n}>{n === 0 ? '无限制（默认）' : `${n} 条`}</option>)}<option value="custom">自定义</option></select>{customCapacity && <input type="number" min="0" step="1" aria-label="自定义历史条数" value={input.historyLimit} onChange={event => setInput({ ...input, historyLimit: Number(event.target.value) })} />}</div></div>
       <div className="field-row"><div><label className="field-label" htmlFor="capture-enabled">自动记录剪贴板</label><p className="field-help">只在本机保存；被来源应用标记为敏感的内容会跳过。</p></div><button id="capture-enabled" role="switch" aria-checked={input.captureEnabled} className={`toggle ${input.captureEnabled ? 'on' : ''}`} onClick={() => setInput({ ...input, captureEnabled: !input.captureEnabled })}><span /></button></div>
+      <div className="field-row"><div><label className="field-label" htmlFor="capture-images">记录图片</label><p className="field-help">默认关闭；开启后保存新复制的图片原图，不限制大小。</p></div><button id="capture-images" role="switch" aria-checked={input.captureImages} className={`toggle ${input.captureImages ? 'on' : ''}`} onClick={() => setInput({ ...input, captureImages: !input.captureImages })}><span /></button></div>
+      <p className="field-help">文件及文件路径不会加入新的剪贴板历史。</p>
     </> : <>
       <div className="settings-section-title"><Sparkles size={18} /><div><h3>让文字，跨越语言</h3><p>连接兼容 OpenAI Chat Completions 的 API 服务。</p></div></div>
       <label className="field-label" htmlFor="api-endpoint">API 服务地址</label><input id="api-endpoint" type="url" value={input.apiEndpoint} onChange={event => setInput({ ...input, apiEndpoint: event.target.value })} placeholder="https://api.openai.com/v1" spellCheck={false} /><p className="field-help">填写以 /v1 结尾的基础地址。支持 HTTPS 和本地 HTTP 服务。</p>
@@ -117,6 +121,8 @@ export default function App() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const returnToCompact = useRef(false);
+  const [visibleCount, setVisibleCount] = useState(60);
   const { entries, categories, settings } = snapshot;
   const notify = (message: string, error = false) => setToast({ message, error });
   async function run(action: () => Promise<unknown>, success?: string) { try { await action(); if (success) notify(success); } catch (error) { notify(error instanceof Error ? error.message : '操作失败，请重试', true); } }
@@ -128,6 +134,9 @@ export default function App() {
     return () => { active = false; unsubscribe(); };
   }, []);
   useEffect(() => { setLanguage(settings.targetLanguage); }, [settings.targetLanguage]);
+  useEffect(() => {
+    if (snapshot.windowMode === 'compact') { setSettingsTab(null); setCategoryModal(false); setClearModal(false); setDeleteCategoryModal(false); setImagePreview(null); }
+  }, [snapshot.windowMode]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(null), toast.error ? 6500 : 3000); return () => clearTimeout(timer); }, [toast]);
   useEffect(() => { const timer = setInterval(() => setSnapshot(current => ({ ...current })), 60_000); return () => clearInterval(timer); }, []);
 
@@ -136,6 +145,7 @@ export default function App() {
     return entries.filter(entry => (filter === 'all' || (filter === 'pinned' ? entry.pinned : filter.startsWith('category:') ? entry.categoryId === filter.slice(9) : entry.kind === filter)) && (!query || `${entry.content} ${entry.translation?.text || ''} ${titleOf(entry.content, entry.kind)}`.toLocaleLowerCase().includes(query)))
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (sort === 'oldest' ? a.updatedAt - b.updatedAt : b.updatedAt - a.updatedAt));
   }, [entries, filter, search, sort]);
+  useEffect(() => setVisibleCount(60), [filter, search, sort]);
   const selected = filtered.find(entry => entry.id === selectedId) || filtered[0];
   const currentCategory = categories.find(category => `category:${category.id}` === filter);
   const filterLabel = filter === 'all' ? '所有记录' : filter === 'pinned' ? '置顶收藏' : currentCategory?.name || kindLabels[filter as ContentKind] || '所有记录';
@@ -145,6 +155,7 @@ export default function App() {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement;
+      if (snapshot.windowMode === 'compact') return;
       if (settingsTab || categoryModal || clearModal || imagePreview || deleteCategoryModal) return;
       if ((event.ctrlKey || event.metaKey) && event.key === ',') { event.preventDefault(); setSettingsTab('general'); return; }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); searchRef.current?.focus(); return; }
@@ -166,10 +177,24 @@ export default function App() {
     setDetailTab('translation'); setTranslatingId(id);
     await run(() => bridge.translate(id, language), '译文已保存'); setTranslatingId(null);
   }
+  async function openManager(id?: string) {
+    returnToCompact.current = false;
+    if (id) { setSelectedId(id); setFilter('all'); setSearch(''); setDetailTab('original'); }
+    await run(() => bridge.setWindowMode('manager'));
+  }
+  async function openCompactSettings() {
+    returnToCompact.current = true;
+    await run(async () => { await bridge.setWindowMode('manager'); setSettingsTab('general'); });
+  }
+  function closeSettings() {
+    setSettingsTab(null);
+    if (returnToCompact.current) { returnToCompact.current = false; void run(() => bridge.setWindowMode('compact')); }
+  }
   const navItem = (id: string, label: string, icon: ReactNode, count?: number) => <button key={id} className={`nav-item ${filter === id ? 'active' : ''}`} onClick={() => changeFilter(id)}><span className="nav-icon">{icon}</span><span>{label}</span><span className="nav-count">{count ?? ''}</span></button>;
 
+  if (snapshot.windowMode === 'compact') return <><CompactBoard snapshot={snapshot} onManage={id => void openManager(id)} onSettings={() => void openCompactSettings()} onError={message => notify(message, true)} />{toast && <div className={`toast ${toast.error ? 'error' : ''}`} role={toast.error ? 'alert' : 'status'}>{toast.message}<button aria-label="关闭提示" onClick={() => setToast(null)}><X size={14} /></button></div>}</>;
   return <div className="application">
-    <header className="titlebar"><div className="titlebar-brand"><img src="./icon.svg" alt="" /><span>PasteBoard <strong>Plus</strong></span><span className="version-badge">{bridge.isDesktop ? '0.1' : '浏览器预览'}</span></div><div className="titlebar-center">给每一次复制，一个好去处。</div>{bridge.isDesktop ? <div className="window-actions"><button aria-label="最小化窗口" onClick={() => void bridge.windowAction('minimize')}><Minus size={15} /></button><button aria-label="最大化窗口" onClick={() => void bridge.windowAction('maximize')}><Maximize2 size={12} /></button><button aria-label="收起到托盘" onClick={() => void bridge.windowAction('hide')}><X size={16} /></button></div> : <span className="preview-label"><Globe2 size={12} /> WEB PREVIEW</span>}</header>
+    <header className="titlebar"><div className="titlebar-brand"><img src="./icon.svg" alt="" /><span>PasteBoard <strong>Plus</strong></span><span className="version-badge">{bridge.isDesktop ? '0.1' : '浏览器预览'}</span></div><button className="return-compact" onClick={() => void run(() => bridge.setWindowMode('compact'))}><ArrowLeft size={13} /> 返回小窗口</button><div className="titlebar-center">给每一次复制，一个好去处。</div>{bridge.isDesktop ? <div className="window-actions"><button aria-label="最小化窗口" onClick={() => void bridge.windowAction('minimize')}><Minus size={15} /></button><button aria-label="最大化窗口" onClick={() => void bridge.windowAction('maximize')}><Maximize2 size={12} /></button><button aria-label="收起到托盘" onClick={() => void bridge.windowAction('hide')}><X size={16} /></button></div> : <span className="preview-label"><Globe2 size={12} /> WEB PREVIEW</span>}</header>
     <div className="workspace">
       <aside className="sidebar"><div className="workspace-label"><div className="workspace-avatar"><Clipboard size={17} /></div><div><strong>我的剪贴板</strong><span>你的灵感中转站</span></div><ChevronDown size={14} /></div>
         <div className="navigation"><span className="section-label">工作空间</span>{navItem('all', '所有记录', <LayoutGrid size={17} />, entries.length)}{navItem('pinned', '置顶收藏', <Pin size={17} />, pinnedCount)}
@@ -178,7 +203,7 @@ export default function App() {
           {categories.map(category => navItem(`category:${category.id}`, category.name, <span className="category-dot" style={{ background: category.color }} />, entries.filter(entry => entry.categoryId === category.id).length))}
           {!categories.length && <button className="empty-category" onClick={() => setCategoryModal(true)}><Plus size={14} /> 创建你的第一个分类</button>}
         </div>
-        <div className="sidebar-bottom"><div className="storage-info"><span>本地历史记录</span><strong>{entries.length}<span> / {settings.historyLimit}</span></strong><div className="storage-track"><div style={{ width: `${Math.min(100, (entries.length - pinnedCount) / settings.historyLimit * 100)}%` }} /></div><p><ShieldCheck size={12} /> 本地存储，安心留存</p></div><button className="sidebar-settings" onClick={() => setSettingsTab('general')}><Settings2 size={17} /> 偏好设置<span>{bridge.platform === 'darwin' ? '⌘' : 'Ctrl'} ,</span></button><div className="sidebar-signature"><span className="tiny-logo">p<span>+</span></span> Small things. Better flow.</div></div>
+        <div className="sidebar-bottom"><div className="storage-info"><span>本地历史记录</span><strong>{entries.length}<span> / {settings.historyLimit === 0 ? '∞' : settings.historyLimit}</span></strong><div className="storage-track"><div style={{ width: `${Math.min(100, (settings.historyLimit === 0 ? 0 : (entries.length - pinnedCount) / settings.historyLimit * 100))}%` }} /></div><p><ShieldCheck size={12} /> 本地存储，安心留存</p></div><button className="sidebar-settings" onClick={() => setSettingsTab('general')}><Settings2 size={17} /> 偏好设置<span>{bridge.platform === 'darwin' ? '⌘' : 'Ctrl'} ,</span></button><div className="sidebar-signature"><span className="tiny-logo">p<span>+</span></span> Small things. Better flow.</div></div>
       </aside>
 
       <main className="main-panel"><div className="main-heading"><div className="breadcrumb">工作空间 <ChevronRight size={12} /> 剪贴板</div><div className="heading-row"><div><h1>{filterLabel}<span className="heading-count">{filtered.length}</span></h1><p>留住刚刚复制的，也留住转瞬即逝的灵感。</p></div><button className="button secondary capture-button" onClick={() => void run(async () => { const result = await bridge.capture(); notify(result.message); })}><Plus size={16} /> 捕获剪贴板</button></div>
@@ -187,8 +212,8 @@ export default function App() {
         {snapshot.warning && <div className="warning-banner" role="alert">{snapshot.warning}</div>}
         {!bridge.isDesktop && <div className="browser-banner"><Globe2 size={14} /><span>浏览器预览 · 历史仅保存在此浏览器；自动监听和全局快捷键请使用桌面版。</span>{entries.length === 0 && <button onClick={() => void run(() => bridge.loadExamples!())}>查看示例 <ArrowRight size={13} /></button>}</div>}
         <div className="records-scroll"><div className="records-subheading"><span>{search ? '搜索结果' : filter === 'pinned' ? '重要的，值得留下' : '最近记录'}<span className="subheading-dot">·</span>{filtered.length} 条</span><label className="sort-control"><ArrowDownUp size={13} /><select aria-label="排序方式" value={sort} onChange={event => setSort(event.target.value)}><option value="recent">最新在前</option><option value="oldest">最早在前</option></select></label></div>
-          {!loaded ? <div className="empty-state"><LoaderCircle className="spin" size={26} /><h2>正在打开你的剪贴板…</h2></div> : filtered.length ? <div className={`entries ${layout}`}>{filtered.map(entry => <EntryCard key={entry.id} entry={entry} selected={selected?.id === entry.id} layout={layout} categoryName={categories.find(category => category.id === entry.categoryId)?.name} onSelect={() => { setSelectedId(entry.id); setDetailTab('original'); setDetailOpen(true); }} onCopy={() => void run(() => bridge.copy(entry.id), '已复制到剪贴板')} onPin={() => void run(() => bridge.pin(entry.id), entry.pinned ? '已取消置顶' : '已置顶，清理时会保留')} />)}</div> : <div className="empty-state"><div className="empty-illustration"><div className="empty-paper back" /><div className="empty-paper front"><Clipboard size={32} strokeWidth={1.3} /><span /><span /></div><span className="empty-spark">✦</span></div><span className="eyebrow">A LITTLE SPACE FOR YOUR IDEAS</span><h2>{search ? '还没有找到这段灵感' : filter !== 'all' ? '这个分类，还在等待灵感' : '下一次复制，从这里开始'}</h2><p>{search ? '换个关键词试试，或搜索译文中的内容。' : bridge.isDesktop ? '复制文字、链接或图片，它们会自动出现在这里。\n不用整理，也不会轻易丢失。' : '在桌面版中，每次复制都会自动留存。\n现在可以捕获一段文字，或载入示例体验界面。'}</p>{search ? <button className="button secondary" onClick={() => setSearch('')}>清空搜索</button> : !bridge.isDesktop && entries.length === 0 ? <button className="button primary" onClick={() => void run(() => bridge.loadExamples!())}>体验示例 <ArrowRight size={15} /></button> : <div className="empty-shortcut"><span>随时唤出</span><Shortcut value={settings.shortcut} small /></div>}</div>}
-          {filtered.length > 0 && <div className="records-end"><span />已经是全部记录了<span /></div>}
+          {!loaded ? <div className="empty-state"><LoaderCircle className="spin" size={26} /><h2>正在打开你的剪贴板…</h2></div> : filtered.length ? <div className={`entries ${layout}`}>{filtered.slice(0, visibleCount).map(entry => <EntryCard key={entry.id} entry={entry} selected={selected?.id === entry.id} layout={layout} categoryName={categories.find(category => category.id === entry.categoryId)?.name} onSelect={() => { setSelectedId(entry.id); setDetailTab('original'); setDetailOpen(true); }} onCopy={() => void run(() => bridge.copy(entry.id), '已复制到剪贴板')} onPin={() => void run(() => bridge.pin(entry.id), entry.pinned ? '已取消置顶' : '已置顶，清理时会保留')} />)}</div> : <div className="empty-state"><div className="empty-illustration"><div className="empty-paper back" /><div className="empty-paper front"><Clipboard size={32} strokeWidth={1.3} /><span /><span /></div><span className="empty-spark">✦</span></div><span className="eyebrow">A LITTLE SPACE FOR YOUR IDEAS</span><h2>{search ? '还没有找到这段灵感' : filter !== 'all' ? '这个分类，还在等待灵感' : '下一次复制，从这里开始'}</h2><p>{search ? '换个关键词试试，或搜索译文中的内容。' : bridge.isDesktop ? '复制文字、链接或图片，它们会自动出现在这里。\n不用整理，也不会轻易丢失。' : '在桌面版中，每次复制都会自动留存。\n现在可以捕获一段文字，或载入示例体验界面。'}</p>{search ? <button className="button secondary" onClick={() => setSearch('')}>清空搜索</button> : !bridge.isDesktop && entries.length === 0 ? <button className="button primary" onClick={() => void run(() => bridge.loadExamples!())}>体验示例 <ArrowRight size={15} /></button> : <div className="empty-shortcut"><span>随时唤出</span><Shortcut value={settings.shortcut} small /></div>}</div>}
+          {filtered.length > visibleCount && <button className="button secondary load-records" onClick={() => setVisibleCount(count => count + 60)}>加载更早的记录（还有 {filtered.length - visibleCount} 条）</button>}{filtered.length > 0 && <div className="records-end"><span />已经是全部记录了<span /></div>}
         </div>
         <footer className="main-status"><button className={`capture-status ${settings.captureEnabled ? 'enabled' : ''}`} onClick={() => void run(() => bridge.saveSettings({ ...settings, captureEnabled: !settings.captureEnabled }), settings.captureEnabled ? '已暂停记录' : '已继续记录')}><span className="status-dot" />{bridge.isDesktop ? settings.captureEnabled ? '正在记录剪贴板' : '已暂停记录' : '浏览器手动捕获'}{settings.captureEnabled ? <Pause size={11} /> : <Play size={11} />}</button><button className="status-shortcut" onClick={() => setSettingsTab('general')}><Keyboard size={13} /><Shortcut value={settings.shortcut} small /><span>唤出{bridge.isDesktop && !snapshot.shortcutRegistered ? ' · 未注册' : ''}</span></button></footer>
       </main>
@@ -203,7 +228,7 @@ export default function App() {
       </> : <div className="detail-empty"><div className="detail-empty-icon"><Clipboard size={26} strokeWidth={1.4} /></div><h3>每一段内容，都有自己的位置</h3><p>选择一条记录，查看完整内容、<br />管理分类，或使用 AI 翻译。</p><div className="detail-empty-feature"><ShieldCheck size={15} /> 你的内容始终由你掌控</div></div>}</aside>
     </div>
     {toast && <div className={`toast ${toast.error ? 'error' : ''}`} role={toast.error ? 'alert' : 'status'}>{toast.error ? <X size={17} /> : <Check size={17} />}<span>{toast.message}</span><button aria-label="关闭提示" onClick={() => setToast(null)}><X size={14} /></button></div>}
-    {settingsTab && <SettingsModal snapshot={snapshot} initialTab={settingsTab} onClose={() => setSettingsTab(null)} onSaved={message => notify(message)} />}
+    {settingsTab && <SettingsModal snapshot={snapshot} initialTab={settingsTab} onClose={closeSettings} onSaved={message => notify(message)} />}
     {categoryModal && <Modal title="给灵感一个分类" subtitle="把相关的内容，放在一起。" onClose={() => setCategoryModal(false)}><form onSubmit={event => { event.preventDefault(); void (async () => { try { await bridge.createCategory(categoryName); setCategoryModal(false); setCategoryName(''); notify('新分类已创建'); } catch (error) { setCategoryError(error instanceof Error ? error.message : '创建失败'); } })(); }}><div className="modal-body"><label className="field-label" htmlFor="category-name">分类名称</label><input id="category-name" autoFocus maxLength={24} placeholder="例如：工作灵感、常用资料…" value={categoryName} onChange={event => setCategoryName(event.target.value)} />{categoryError && <div role="alert" className="form-error">{categoryError}</div>}</div><div className="modal-footer"><button type="button" className="button secondary" onClick={() => setCategoryModal(false)}>取消</button><button className="button primary" type="submit" disabled={!categoryName.trim()}><Plus size={15} /> 创建分类</button></div></form></Modal>}
     {clearModal && <Modal title="清理剪贴板历史？" subtitle="清理后无法恢复。置顶的内容可以继续保留。" onClose={() => setClearModal(false)}><div className="modal-body"><label className="checkbox-label"><input type="checkbox" checked={clearPinned} onChange={event => setClearPinned(event.target.checked)} />同时清理 {pinnedCount} 条置顶记录</label><p className="field-help">将删除 {clearPinned ? entries.length : entries.length - pinnedCount} 条记录及其图片文件。</p></div><div className="modal-footer"><button className="button secondary" onClick={() => setClearModal(false)}>取消</button><button className="button destructive" onClick={() => void run(async () => { await bridge.clear(clearPinned); setClearModal(false); }, '历史记录已清理')}>确认清理</button></div></Modal>}
     {deleteCategoryModal && <Modal title={`删除「${currentCategory?.name || '分类'}」？`} subtitle="分类内的历史记录会保留，并恢复为未分类。" onClose={() => setDeleteCategoryModal(false)}><div className="modal-footer"><button className="button secondary" onClick={() => setDeleteCategoryModal(false)}>取消</button><button className="button destructive" onClick={() => void run(async () => { if (currentCategory) await bridge.deleteCategory(currentCategory.id); changeFilter('all'); setDeleteCategoryModal(false); }, '分类已删除')}>删除分类</button></div></Modal>}

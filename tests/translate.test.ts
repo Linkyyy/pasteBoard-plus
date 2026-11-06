@@ -43,6 +43,6 @@ describe('settings validation', () => {
   it('validates shortcut syntax and history bounds', () => {
     expect(settingsSchema.safeParse(DEFAULT_SETTINGS).success).toBe(true);
     expect(settingsSchema.safeParse({ ...DEFAULT_SETTINGS, shortcut: 'V' }).success).toBe(false);
-    expect(settingsSchema.safeParse({ ...DEFAULT_SETTINGS, historyLimit: 10 }).success).toBe(false);
+    expect(settingsSchema.safeParse({ ...DEFAULT_SETTINGS, historyLimit: -1 }).success).toBe(false);
   });
 });

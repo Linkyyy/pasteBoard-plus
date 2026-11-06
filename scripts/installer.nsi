@@ -3,6 +3,7 @@
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
+!include "extractAppPackage.nsh"
 
 !define APP_EXE "PasteBoard Plus.exe"
 !define UNINSTALL_EXE "Uninstall PasteBoard Plus.exe"
@@ -61,8 +62,22 @@ Function un.onInit
 FunctionEnd
 
 Section "PasteBoard Plus"
+  ; Reuse electron-builder's CRC-checked, NSIS-compatible LZMA payload.
+  ; Avoid embedding every runtime file again with weaker zlib compression.
+  InitPluginsDir
+  SetCompress off
+  File "/oname=$PLUGINSDIR\app.7z" "${APP_64}"
+  SetCompress auto
   SetOutPath "$INSTDIR"
-  File /r "${PROJECT_DIR}/release/win-unpacked/*"
+  !insertmacro extractUsing7za "$PLUGINSDIR\app.7z"
+  IfFileExists "$INSTDIR\${APP_EXE}" 0 extractionFailed
+  IfFileExists "$INSTDIR\resources\app.asar" 0 extractionFailed
+  Goto extractionComplete
+  extractionFailed:
+    MessageBox MB_OK|MB_ICONSTOP "应用文件解压失败，请重新运行安装程序。$\r$\nExtraction failed. Please run the installer again."
+    Abort
+  extractionComplete:
+  Delete "$PLUGINSDIR\app.7z"
   WriteUninstaller "$INSTDIR\${UNINSTALL_EXE}"
   CreateDirectory "$SMPROGRAMS\PasteBoard Plus"
   CreateShortCut "$SMPROGRAMS\PasteBoard Plus\PasteBoard Plus.lnk" "$INSTDIR\${APP_EXE}"
@@ -77,6 +92,7 @@ Section "PasteBoard Plus"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\${UNINSTALL_EXE}"'
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
+  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "EstimatedSize" ${ESTIMATED_SIZE}
 SectionEnd
 
 Section "Uninstall"

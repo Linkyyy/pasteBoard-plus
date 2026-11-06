@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { HistoryStore } from '../electron/store';
 
 let directory: string;
@@ -9,6 +10,34 @@ beforeEach(() => { directory = mkdtempSync(join(tmpdir(), 'pasteboard-store-test
 afterEach(() => rmSync(directory, { recursive: true, force: true }));
 
 describe('persistent history', () => {
+  it('keeps more than 1200 entries and pins in unlimited mode across restart', () => {
+    const store = new HistoryStore(directory); store.addText('seed');
+    const file = join(directory, 'history.json');
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    expect(raw.settings.historyLimit).toBe(0);
+    expect(raw.settings.captureImages).toBe(false);
+    raw.entries = Array.from({ length: 1501 }, (_, i) => ({ ...raw.entries[0], id: randomUUID(), content: `History ${i}`, hash: `hash-${i}`, pinned: i < 110 }));
+    writeFileSync(file, JSON.stringify(raw));
+    const reopened = new HistoryStore(directory);
+    expect(reopened.entries).toHaveLength(1501);
+    reopened.addText('newest');
+    expect(new HistoryStore(directory).entries).toHaveLength(1502);
+    expect(reopened.entries.some(entry => entry.content === 'History 1500')).toBe(true);
+    reopened.updateSettings({ ...reopened.settings, historyLimit: 50 });
+    expect(reopened.entries.filter(entry => !entry.pinned)).toHaveLength(50);
+    expect(reopened.entries.filter(entry => entry.pinned)).toHaveLength(110);
+  });
+  it.each([[300, 0], [500, 500]])('migrates old capacity %s to %s without losing history', (oldLimit, expected) => {
+    const store = new HistoryStore(directory); store.addText('previous version');
+    const file = join(directory, 'history.json'); const raw = JSON.parse(readFileSync(file, 'utf8'));
+    delete raw.settings.captureImages; raw.settings.historyLimit = oldLimit;
+    writeFileSync(file, JSON.stringify(raw));
+    const restored = new HistoryStore(directory);
+    expect(restored.entries[0].content).toBe('previous version');
+    expect(restored.settings.historyLimit).toBe(expected);
+    expect(restored.settings.captureImages).toBe(false);
+  });
+
   it('restores text, pinned state, categories, and translation after reopening', () => {
     const store = new HistoryStore(directory);
     store.addText('A quiet morning.'); const id = store.entries[0].id;
@@ -75,12 +104,12 @@ describe('persistent history', () => {
     reopened.remove(id);
     expect(readdirSync(join(directory, 'images'))).toEqual([]);
   });
-  it('rejects oversized text, duplicate categories, and pin overflow', () => {
+  it('rejects oversized text and duplicate categories while allowing more than 100 pins', () => {
     const store = new HistoryStore(directory);
     expect(store.addText('   ')).toBe(false);
     expect(() => store.addText('x'.repeat(100_001))).toThrow('100,000');
     store.createCategory('Work'); expect(() => store.createCategory(' Work ')).toThrow('已存在');
     for (let i = 0; i < 100; i++) { store.addText(`pinned ${i}`); store.togglePin(store.entries[0].id); }
-    store.addText('overflow'); expect(() => store.togglePin(store.entries[0].id)).toThrow('最多置顶');
+    store.addText('one more'); store.togglePin(store.entries[0].id); expect(store.entries.filter(entry => entry.pinned)).toHaveLength(101);
   });
 });

@@ -20,7 +20,7 @@ let desktop;
 const output = [];
 async function launch() {
   const instance = await _electron.launch({
-    args: [resolve('.'), '--no-sandbox', '--disable-dev-shm-usage'],
+    args: [resolve(process.env.PASTEBOARD_SMOKE_APP || '.'), '--no-sandbox', '--disable-dev-shm-usage'],
     env: { ...process.env, PASTEBOARD_USER_DATA: data, PASTEBOARD_DISABLE_GPU: '1',
       NO_PROXY: `${process.env.NO_PROXY || ''},localhost,127.0.0.1`, no_proxy: `${process.env.no_proxy || ''},localhost,127.0.0.1` },
     timeout: 30_000,
@@ -28,7 +28,13 @@ async function launch() {
   instance.process().stderr?.on('data', chunk => output.push(chunk.toString()));
   const page = await instance.firstWindow();
   await page.waitForFunction(() => window.pasteboard?.isDesktop === true);
+  await page.getByRole('heading', { name: '剪贴板', exact: true }).waitFor();
+  const bounds = await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+  assert.equal(bounds.width, 400); assert.equal(bounds.height, 580);
+  await page.getByRole('button', { name: '管理记录', exact: true }).click();
   await page.getByRole('heading', { name: '所有记录' }).waitFor();
+  const manager = await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+  assert(manager.width >= 1060 && manager.height >= 720);
   return instance;
 }
 async function state() { return (await desktop.firstWindow()).evaluate(() => window.pasteboard.getSnapshot()); }
@@ -49,18 +55,39 @@ try {
   await page.evaluate(() => window.pasteboard.clear(true));
   for (const [text, kind] of [
     ['Hello, creative world.', 'text'], ['https://example.com/clipboard', 'url'],
-    ['C:\\Users\\Alice\\Documents\\notes.md', 'path'], ['const idea = "make it useful";', 'code'],
+    ['const idea = "make it useful";', 'code'],
   ]) {
     await writeText(text);
     const current = await until(s => s.entries.some(entry => entry.content === text), `capture ${kind}`);
     assert.equal(current.entries.find(entry => entry.content === text).kind, kind);
   }
-  console.log('PASS actual system clipboard: text, URL, file path, code, automatic capture');
+  await writeText('C:\\Users\\Alice\\Documents\\notes.md');
+  const skippedFile = await page.evaluate(() => window.pasteboard.capture());
+  assert.equal(skippedFile.captured, false);
+  assert.equal((await state()).entries.some(entry => entry.kind === 'path'), false);
+  assert.equal((await state()).settings.historyLimit, 0);
+  assert.equal((await state()).settings.captureImages, false);
+  await page.evaluate(() => window.pasteboard.setWindowMode('compact'));
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
+  await page.getByRole('dialog', { name: '偏好设置' }).waitFor();
+  assert((await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds())).width >= 1060);
+  await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();
+  await page.getByTestId('compact-board').waitFor();
+  assert.equal((await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds())).width, 400);
+  await mkdir('test-results', { recursive: true });
+  await page.screenshot({ path: 'test-results/desktop-compact.png' });
+  await page.getByRole('button', { name: '管理记录', exact: true }).click();
+  console.log('PASS compact 400x580 default, explicit manager/settings resizing, unlimited default and excluded files');
+  console.log('PASS actual system clipboard: text, URL, code, automatic capture');
 
   await desktop.evaluate(async ({ clipboard, ClipboardItem, nativeImage, app }) => {
     const image = nativeImage.createFromPath(`${app.getAppPath()}/assets/icon.png`).toPNG();
     await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(image)], { type: 'image/png' }) })]);
   });
+  const imageDisabled = await page.evaluate(() => window.pasteboard.capture());
+  assert.equal(imageDisabled.captured, false);
+  assert.equal((await state()).entries.some(entry => entry.kind === 'image'), false);
+  await page.evaluate(async () => { const s = await window.pasteboard.getSnapshot(); await window.pasteboard.saveSettings({ ...s.settings, captureImages: true }); });
   const withImage = await until(s => s.entries.some(entry => entry.kind === 'image'), 'capture original image');
   const image = withImage.entries.find(entry => entry.kind === 'image');
   assert.equal(image.image.width, 256); assert.equal(image.image.height, 256);
