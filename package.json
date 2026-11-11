@@ -1,7 +1,7 @@
 {
   "name": "pasteboard-plus",
   "productName": "PasteBoard Plus",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A thoughtful clipboard companion with collections and AI translation.",
   "author": "PasteBoard Plus",
   "license": "MIT",
@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:desktop": "node scripts/smoke-desktop.mjs",
+    "test:desktop": "node scripts/smoke-popup-position.mjs && node scripts/smoke-desktop.mjs",
     "test:desktop:headless": "node scripts/with-display.mjs -- npm run test:desktop",
     "verify:package": "node scripts/check-package.mjs",
     "start": "electron .",

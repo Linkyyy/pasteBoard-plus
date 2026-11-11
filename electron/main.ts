@@ -6,6 +6,7 @@ import { HistoryStore } from './store';
 import { idSchema, languageSchema, settingsSchema } from './schema';
 import { TranslationService } from './translation-service';
 import { WindowsFocus, type FocusContext } from './windows-focus';
+import { PopupSession } from './popup-session';
 import { popupPosition } from '../shared/popup-position';
 import { hasFocusTarget } from '../shared/focus-target';
 import type { Snapshot } from '../shared/types';
@@ -26,7 +27,7 @@ let focusTimer: ReturnType<typeof setInterval> | undefined;
 let pasting = false;
 let captureWarning: string | null = null;
 let windowMode: Snapshot['windowMode'] = 'compact';
-let focusTarget: FocusContext | null = null;
+let popupSession: PopupSession | null = null;
 let focusService: WindowsFocus | null = null;
 let focusError: string | null = null;
 let opening = 0;
@@ -45,6 +46,7 @@ function canSecurelyStoreKey() {
     && !(process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text');
 }
 function snapshot(): Snapshot {
+  const focusTarget = popupSession?.target;
   return { windowMode, entries: store.entries, categories: store.categories, settings: store.settings,
     hasApiKey: Boolean(apiKey), keyStorage: canSecurelyStoreKey() ? 'secure' : 'session',
     shortcutRegistered, warning: captureWarning || store.warning, insertion: { supported: process.platform === 'win32' && !focusError, hasTarget: hasFocusTarget(focusTarget), caretLocated: Boolean(focusTarget?.caretLocated), message: focusError } };
@@ -58,10 +60,11 @@ function showWindow() {
   if (windowMode === 'compact' && process.platform === 'win32') window.showInactive();
   else { if (window.isMinimized()) window.restore(); window.show(); window.focus(); }
 }
-function setWindowMode(mode: Snapshot['windowMode']) {
+function setWindowMode(mode: Snapshot['windowMode'], target: FocusContext | null = null, fallback = screen.getCursorScreenPoint()) {
   if (!window) return;
   windowMode = mode;
-  if (mode === 'manager') { opening++; openingPending = false; focusTarget = null; if (process.platform === 'win32') globalShortcut.unregister('Escape'); }
+  popupSession?.end(); popupSession = null;
+  if (mode === 'manager') { opening++; openingPending = false; if (process.platform === 'win32') globalShortcut.unregister('Escape'); }
   window.setFocusable(mode !== 'compact' || process.platform !== 'win32');
   window.setSkipTaskbar(mode === 'compact' && process.platform === 'win32');
   if (window.isMaximized()) window.unmaximize();
@@ -72,7 +75,7 @@ function setWindowMode(mode: Snapshot['windowMode']) {
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const width = Math.min(mode === 'compact' ? 400 : 1360, area.width);
   const height = Math.min(mode === 'compact' ? 580 : 900, area.height);
-  if (mode === 'compact') positionCompact();
+  if (mode === 'compact') popupSession = new PopupSession(window, compactBounds(target, fallback), target);
   else window.setBounds({ width, height, x: area.x + Math.round((area.width - width) / 2), y: area.y + Math.round((area.height - height) / 2) });
   broadcast();
 }
@@ -80,22 +83,22 @@ function ownWindowHandle() {
   const handle = window!.getNativeWindowHandle();
   return handle.length >= 8 ? handle.readBigUInt64LE(0).toString() : String(handle.readUInt32LE(0));
 }
-function positionCompact() {
-  if (!window) return;
-  let anchor = { ...screen.getCursorScreenPoint(), width: 1, height: 1 };
+function compactBounds(focusTarget: FocusContext | null, fallback: Electron.Point) {
+  let anchor = { ...fallback, width: 1, height: 1 };
   if (focusTarget && (focusTarget.caretLocated || focusTarget.editable) && focusTarget.height > 0) {
     const top = screen.screenToDipPoint({ x: Math.round(focusTarget.x), y: Math.round(focusTarget.y) });
     const bottom = screen.screenToDipPoint({ x: Math.round(focusTarget.x + focusTarget.width), y: Math.round(focusTarget.y + focusTarget.height) });
     anchor = { ...top, width: Math.max(1, bottom.x - top.x), height: Math.max(1, bottom.y - top.y) };
   }
-  const bounds = popupPosition(anchor, screen.getDisplayNearestPoint(anchor).workArea, 400, 580);
-  const current = window.getBounds();
-  if (current.x !== bounds.x || current.y !== bounds.y || current.width !== bounds.width || current.height !== bounds.height) window.setBounds(bounds);
+  return popupPosition(anchor, screen.getDisplayNearestPoint(anchor).workArea, 400, 580);
 }
 async function openCompact() {
   const generation = ++opening;
   openingPending = true;
-  focusTarget = null; focusError = null;
+  popupSession?.end(); popupSession = null; focusError = null;
+  let focusTarget: FocusContext | null = null;
+  // Capture the fallback before awaiting UI Automation; it remains fixed while open.
+  const fallback = screen.getCursorScreenPoint();
   if (process.platform === 'win32' && windowMode === 'manager' && window?.isVisible()) {
     window.hide();
     await new Promise(resolve => setTimeout(resolve, 75));
@@ -114,7 +117,7 @@ async function openCompact() {
     } catch (error) { focusError = error instanceof Error ? error.message : '无法读取输入光标。'; }
   }
   if (generation !== opening) return;
-  openingPending = false; setWindowMode('compact'); showWindow();
+  openingPending = false; setWindowMode('compact', focusTarget, fallback); showWindow();
 }
 function toggleWindow() { if ((window?.isVisible() && windowMode === 'compact') || openingPending) { opening++; openingPending = false; window?.hide(); } else void openCompact(); }
 function updateTray() {
@@ -233,6 +236,7 @@ function registerHandlers() {
     if (windowMode !== 'compact') throw new Error('请从剪贴板小窗口选择要粘贴的词条。');
     await writeEntry(idSchema.parse(rawId), z.boolean().parse(rawTranslated));
     if (process.platform === 'win32' && store.settings.autoPaste) {
+      const focusTarget = popupSession?.target;
       if (!focusService || !focusTarget) throw new Error('内容已复制。请先在输入框中按快捷键唤出剪贴板。');
       pasting = true;
       try {
@@ -309,7 +313,7 @@ async function createWindow() {
   window.on('show', () => {
     if (process.platform === 'win32' && windowMode === 'compact') globalShortcut.register('Escape', () => { opening++; openingPending = false; window?.hide(); });
   });
-  window.on('hide', () => { if (process.platform === 'win32') globalShortcut.unregister('Escape'); });
+  window.on('hide', () => { popupSession?.end(); popupSession = null; if (process.platform === 'win32') globalShortcut.unregister('Escape'); });
   window.once('ready-to-show', () => void openCompact());
   const devUrl = process.env.PASTEBOARD_DEV_URL;
   if (!app.isPackaged && devUrl === 'http://localhost:5173') await window.loadURL(devUrl);
@@ -350,14 +354,13 @@ else {
     void poll(); timer = setInterval(() => void poll(), 800);
     let following = false;
     focusTimer = setInterval(async () => {
-      if (following || pasting || openingPending || windowMode !== 'compact' || !window?.isVisible() || !focusService || !focusTarget || !hasFocusTarget(focusTarget)) return;
+      const session = popupSession;
+      if (following || pasting || openingPending || windowMode !== 'compact' || !window?.isVisible() || !focusService || !session?.target || !hasFocusTarget(session.target)) return;
       following = true;
-      const previous = focusTarget;
       try {
         const current = await focusService.capture(ownWindowHandle());
-        if (pasting || windowMode !== 'compact' || !window?.isVisible() || focusTarget !== previous) return;
-        if (current.window !== previous.window || current.control !== previous.control || (previous.elementKey && current.elementKey !== previous.elementKey)) { focusTarget = null; window.hide(); return; }
-        focusTarget = current; positionCompact();
+        if (pasting || openingPending || windowMode !== 'compact' || !window?.isVisible() || popupSession !== session) return;
+        session.observe(current);
       } catch { /* Keep the original target; paste performs its own final validation. */ }
       finally { following = false; }
     }, 500);
