@@ -1,8 +1,8 @@
 *
 !website/
 !website/**
-!public/
-!public/icon.svg
+!assets/
+!assets/icon.png
 !package.json
 !vercel.json
 website/dist/

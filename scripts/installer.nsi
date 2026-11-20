@@ -10,6 +10,7 @@
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\PasteBoardPlus"
 
 Name "PasteBoard Plus"
+BrandingText "PasteBoard Plus"
 InstallDir "$LOCALAPPDATA\Programs\PasteBoard Plus"
 InstallDirRegKey HKCU "Software\PasteBoardPlus" "InstallLocation"
 RequestExecutionLevel user
@@ -19,7 +20,12 @@ ShowInstDetails show
 ShowUninstDetails show
 
 !define MUI_ABORTWARNING
+!define MUI_WELCOMEPAGE_TITLE "$(WelcomeTitle)"
+!define MUI_WELCOMEPAGE_TEXT "$(WelcomeText)"
+!define MUI_FINISHPAGE_TITLE "$(FinishTitle)"
+!define MUI_FINISHPAGE_TEXT "$(FinishText)"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
+!define MUI_FINISHPAGE_RUN_TEXT "$(RunAppText)"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -29,6 +35,17 @@ ShowUninstDetails show
 !insertmacro MUI_UNPAGE_FINISH
 !insertmacro MUI_LANGUAGE "SimpChinese"
 !insertmacro MUI_LANGUAGE "English"
+
+LangString WelcomeTitle ${LANG_SIMPCHINESE} "安装 PasteBoard Plus"
+LangString WelcomeText ${LANG_SIMPCHINESE} "选择安装位置后，即可使用剪贴板历史、离线词库和 AI 作答与翻译。$\r$\n$\r$\n安装完成后，可在应用设置中连接 AI 服务。"
+LangString FinishTitle ${LANG_SIMPCHINESE} "安装完成"
+LangString FinishText ${LANG_SIMPCHINESE} "打开 PasteBoard Plus，按 Ctrl + Shift + V 唤出剪贴板。"
+LangString RunAppText ${LANG_SIMPCHINESE} "打开 PasteBoard Plus"
+LangString WelcomeTitle ${LANG_ENGLISH} "Install PasteBoard Plus"
+LangString WelcomeText ${LANG_ENGLISH} "Choose where to install PasteBoard Plus to use clipboard history, the offline dictionary, and AI answers and translations.$\r$\n$\r$\nConnect your AI provider in the app settings after installation."
+LangString FinishTitle ${LANG_ENGLISH} "Installation complete"
+LangString FinishText ${LANG_ENGLISH} "Open PasteBoard Plus and press Ctrl + Shift + V to see your clipboard history."
+LangString RunAppText ${LANG_ENGLISH} "Open PasteBoard Plus"
 
 !macro AppClosedFunction PREFIX
 Function ${PREFIX}EnsureAppClosed

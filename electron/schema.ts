@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CLIPBOARD_AI_MODES } from '../shared/types';
 export const idSchema = z.string().uuid();
 export const languageSchema = z.enum(['zh-CN', 'en', 'ja', 'ko', 'de', 'fr']);
 export const endpointSchema = z.string().trim().url().max(500).refine(value => {
@@ -13,6 +14,7 @@ export const settingsSchema = z.object({
   apiKey: z.string().trim().max(2048).optional(), clearApiKey: z.boolean().optional(),
   sourceLanguage: z.enum(['auto', 'zh-CN', 'en', 'ja']).default('auto'),
   translationMode: z.enum(['auto', 'local', 'ai']).default('auto'),
+  clipboardAiMode: z.enum(CLIPBOARD_AI_MODES).default('off'),
   fontSize: z.union([z.literal(14), z.literal(16), z.literal(18)]).default(16),
   autoPaste: z.boolean().default(true),
 });

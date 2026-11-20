@@ -5,11 +5,12 @@ import { z } from 'zod';
 import { HistoryStore } from './store';
 import { idSchema, languageSchema, settingsSchema } from './schema';
 import { TranslationService } from './translation-service';
+import { answerText, translateText } from './translate';
 import { WindowsFocus, type FocusContext } from './windows-focus';
 import { PopupSession } from './popup-session';
 import { popupPosition } from '../shared/popup-position';
 import { hasFocusTarget } from '../shared/focus-target';
-import type { Snapshot } from '../shared/types';
+import { AI_MODE_LABELS, CLIPBOARD_AI_MODES, apiBaseUrl, type AiResult, type Settings, type Snapshot } from '../shared/types';
 import { classify } from '../shared/classify';
 
 if (process.env.PASTEBOARD_USER_DATA) app.setPath('userData', process.env.PASTEBOARD_USER_DATA);
@@ -26,6 +27,8 @@ let timer: ReturnType<typeof setInterval> | undefined;
 let focusTimer: ReturnType<typeof setInterval> | undefined;
 let pasting = false;
 let captureWarning: string | null = null;
+let clipboardAi: Snapshot['clipboardAi'];
+let aiJob: { controller: AbortController; sourceId: string } | undefined;
 let windowMode: Snapshot['windowMode'] = 'compact';
 let popupSession: PopupSession | null = null;
 let focusService: WindowsFocus | null = null;
@@ -49,7 +52,8 @@ function snapshot(): Snapshot {
   const focusTarget = popupSession?.target;
   return { windowMode, entries: store.entries, categories: store.categories, settings: store.settings,
     hasApiKey: Boolean(apiKey), keyStorage: canSecurelyStoreKey() ? 'secure' : 'session',
-    shortcutRegistered, warning: captureWarning || store.warning, insertion: { supported: process.platform === 'win32' && !focusError, hasTarget: hasFocusTarget(focusTarget), caretLocated: Boolean(focusTarget?.caretLocated), message: focusError } };
+    shortcutRegistered, warning: captureWarning || store.warning, clipboardAi,
+    insertion: { supported: process.platform === 'win32' && !focusError, hasTarget: hasFocusTarget(focusTarget), caretLocated: Boolean(focusTarget?.caretLocated), message: focusError } };
 }
 function broadcast() {
   if (window && !window.isDestroyed()) window.webContents.send('pasteboard:changed', snapshot());
@@ -121,10 +125,18 @@ async function openCompact() {
 }
 function toggleWindow() { if ((window?.isVisible() && windowMode === 'compact') || openingPending) { opening++; openingPending = false; window?.hide(); } else void openCompact(); }
 function updateTray() {
-  tray?.setContextMenu(Menu.buildFromTemplate([
+  if (!tray) return;
+  const { captureEnabled, clipboardAiMode } = store.settings;
+  tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开剪贴板', click: openCompact },
     { label: '管理记录', click: () => { setWindowMode('manager'); showWindow(); } },
-    { label: store.settings.captureEnabled ? '暂停记录' : '继续记录', click: () => { store.updateSettings({ ...store.settings, captureEnabled: !store.settings.captureEnabled }); broadcast(); } },
+    { label: captureEnabled ? '暂停记录' : '继续记录', click: () => {
+      void withClipboard(() => applySettings({ ...store.settings, captureEnabled: !store.settings.captureEnabled })).catch(reportCaptureError);
+    } },
+    { label: 'AI 剪贴板模式', submenu: CLIPBOARD_AI_MODES.map(mode => ({
+      label: AI_MODE_LABELS[mode], type: 'radio' as const, checked: mode === (apiKey ? clipboardAiMode : 'off'), enabled: mode === 'off' || Boolean(apiKey),
+      click: () => { void withClipboard(() => applySettings({ ...store.settings, clipboardAiMode: apiKey ? mode : 'off' })).catch(reportCaptureError); },
+    })) },
     { type: 'separator' }, { label: '退出', click: () => app.quit() },
   ]));
 }
@@ -155,29 +167,98 @@ async function readFilePaths(items: Electron.ClipboardItem[]): Promise<string | 
   }
   return null;
 }
-async function capture(manual = false) {
-  if (!store.settings.captureEnabled && !manual) return { captured: false, message: '已暂停记录' };
+async function readClipboardContent() {
   const items = await clipboard.read();
   const formats = items.flatMap(item => item.types);
   const sensitive = formats.some(format => /ConcealedType|TransientType|passwordManagerHint|ExcludeClipboardContentFromMonitorProcessing/i.test(format));
   const historyHint = await readBlob(items, 'electron application/osclipboard;format="CanIncludeInClipboardHistory"');
   const excluded = historyHint && Buffer.from(await historyHint.arrayBuffer()).every(byte => byte === 0);
-  if (sensitive || excluded) return { captured: false, message: '已跳过被应用标记为敏感的内容' };
-  if (formats.some(format => /CF_HDROP|FileName[AW]?|FileGroupDescriptor|FileContents|NSFilenamesPboardType|public\.file-url|application\/x-moz-file/i.test(format))) return { captured: false, message: '文件剪贴板内容不记录' };
+  if (sensitive || excluded) return { skipped: '已跳过被应用标记为敏感的内容' } as const;
+  if (formats.some(format => /CF_HDROP|FileName[AW]?|FileGroupDescriptor|FileContents|NSFilenamesPboardType|public\.file-url|application\/x-moz-file/i.test(format)) || await readFilePaths(items)) return { skipped: '文件剪贴板内容不记录' } as const;
   const textBlob = await readBlob(items, 'text/plain');
-  if (await readFilePaths(items)) return { captured: false, message: '文件剪贴板内容不记录' };
   const text = textBlob ? await textBlob.text() : '';
+  return { items, formats, text };
+}
+function textFingerprint(text: string) {
+  return createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex');
+}
+function cancelClipboardAi() {
+  aiJob?.controller.abort();
+  aiJob = undefined;
+  clipboardAi = undefined;
+}
+function startClipboardAi(text: string, sourceId: string, fingerprint: string, mode: AiResult, settings: Settings) {
+  const controller = new AbortController();
+  const job = { controller, sourceId };
+  aiJob = job;
+  clipboardAi = { state: 'working' };
+  const result = mode === 'answer' ? answerText(text, settings, apiKey, controller.signal)
+    : translateText(text, settings.targetLanguage, settings, apiKey, undefined, controller.signal).then(translation => translation.text);
+  void result.then(content => withClipboard(async () => {
+    if (aiJob !== job) return;
+    const current = lastFingerprint === fingerprint ? await readClipboardContent().catch(() => null) : null;
+    if (aiJob !== job) return;
+    const entryId = store.addAiResult(content, mode);
+    let clipboardUpdated = false;
+    if (current?.text && textFingerprint(current.text) === fingerprint) {
+      try {
+        await clipboard.writeText(content);
+        lastFingerprint = textFingerprint(content);
+        clipboardUpdated = true;
+      } catch { /* The saved result can still be copied from history. */ }
+    }
+    if (aiJob === job) clipboardAi = { state: 'ready', entryId, clipboardUpdated };
+  })).catch(error => {
+    if (aiJob === job) clipboardAi = { state: 'error', message: error instanceof Error ? error.message : 'AI 处理失败，请重试。' };
+  }).finally(() => {
+    if (aiJob === job) {
+      aiJob = undefined;
+      broadcast();
+    }
+  });
+}
+function clipboardChangedWithoutText() {
+  lastFingerprint = '';
+  if (clipboardAi?.state === 'ready' && clipboardAi.clipboardUpdated) {
+    clipboardAi = { ...clipboardAi, clipboardUpdated: false };
+    broadcast();
+  }
+}
+async function capture(manual = false, allowAi = true) {
+  const settings = store.settings;
+  if (!settings.captureEnabled && !manual) return { captured: false, message: '已暂停记录' };
+  const current = await readClipboardContent();
+  if (current.skipped) {
+    clipboardChangedWithoutText();
+    return { captured: false, message: current.skipped };
+  }
+  const { items, formats, text } = current;
   if (text.trim()) {
-    if (classify(text) === 'path') return { captured: false, message: '文件路径不记录' };
-    const fingerprint = createHash('sha256').update(text).digest('hex');
-    if (fingerprint === lastFingerprint && !manual) return { captured: false, message: '剪贴板没有变化' };
+    const fingerprint = textFingerprint(text);
+    const changed = fingerprint !== lastFingerprint;
+    if (!changed && !manual) return { captured: false, message: '剪贴板没有变化' };
+    if (!changed && clipboardAi?.state === 'ready' && clipboardAi.clipboardUpdated) return { captured: false, message: 'AI 结果已保存到剪贴板历史' };
+    if (classify(text) === 'path') {
+      clipboardChangedWithoutText();
+      return { captured: false, message: '文件路径不记录' };
+    }
+    if (changed) cancelClipboardAi();
     if (text.length > 100_000) { lastFingerprint = fingerprint; throw new Error('这段文字超过 100,000 字，未保存。'); }
-    store.addText(text); lastFingerprint = fingerprint;
+    const sourceId = store.addText(text);
+    lastFingerprint = fingerprint;
+    if (sourceId && changed && allowAi && settings.captureEnabled && settings.clipboardAiMode !== 'off' && apiKey) {
+      startClipboardAi(text, sourceId, fingerprint, settings.clipboardAiMode, settings);
+    }
   } else {
-    if (!store.settings.captureImages) return { captured: false, message: '图片记录未开启，可在设置中开启' };
-    if (!formats.some(format => /image|bitmap|png|tiff|dib/i.test(format))) return { captured: false, message: '剪贴板中没有可保存的文字或图片' };
+    if (!settings.captureImages) {
+      clipboardChangedWithoutText();
+      return { captured: false, message: '图片记录未开启，可在设置中开启' };
+    }
     const imageFormat = formats.find(format => format.startsWith('image/'));
-    if (!imageFormat) return { captured: false, message: '剪贴板没有可识别的图片' };
+    if (!imageFormat) {
+      clipboardChangedWithoutText();
+      return { captured: false, message: '剪贴板没有可保存的文字或图片' };
+    }
     const blob = await readBlob(items, imageFormat);
     if (!blob) return { captured: false, message: '无法读取剪贴板图片' };
     const image = nativeImage.createFromBuffer(Buffer.from(await blob.arrayBuffer()));
@@ -194,9 +275,30 @@ async function capture(manual = false) {
     }).toDataURL();
     store.addImage(png, thumbnail, width, height);
     lastFingerprint = fingerprint;
+    if (clipboardAi?.state === 'ready') clipboardAi = { ...clipboardAi, clipboardUpdated: false };
   }
   captureWarning = null; broadcast();
   return { captured: true, message: '已保存到剪贴板历史' };
+}
+function reportCaptureError(error: unknown) {
+  const message = error instanceof Error ? error.message : '读取剪贴板失败';
+  if (captureWarning !== message) { captureWarning = message; broadcast(); }
+}
+async function applySettings(settings: Settings, nextKey = apiKey, keyUpdate?: { encryptedKey: string | undefined }) {
+  const previous = store.settings;
+  const aiChanged = previous.captureEnabled !== settings.captureEnabled || previous.clipboardAiMode !== settings.clipboardAiMode
+    || apiBaseUrl(previous.apiEndpoint) !== apiBaseUrl(settings.apiEndpoint) || previous.apiModel !== settings.apiModel
+    || (settings.clipboardAiMode === 'translate' && previous.targetLanguage !== settings.targetLanguage) || nextKey !== apiKey;
+  store.updateSettings(settings, keyUpdate);
+  apiKey = nextKey;
+  if (aiChanged) {
+    cancelClipboardAi();
+    if (settings.captureEnabled && settings.clipboardAiMode !== 'off' && apiKey) {
+      // Record the clipboard already present when enabling a mode without sending it.
+      await capture(false, false).catch(reportCaptureError);
+    }
+  }
+  broadcast();
 }
 function handle(channel: string, handler: (...args: any[]) => unknown) {
   ipcMain.handle(`pasteboard:${channel}`, async (event, ...args) => {
@@ -216,8 +318,9 @@ async function writeEntry(id: string, translated: boolean) {
     lastFingerprint = createHash('sha256').update(copiedPng).digest('hex');
   } else {
     const content = translated ? entry.translation!.text : entry.content;
-    await clipboard.writeText(content); lastFingerprint = createHash('sha256').update(content).digest('hex');
+    await clipboard.writeText(content); lastFingerprint = textFingerprint(content);
   }
+  cancelClipboardAi();
   store.recordCopy(id); broadcast();
 }
 function registerHandlers() {
@@ -253,32 +356,51 @@ function registerHandlers() {
     const entry = store.require(idSchema.parse(rawId));
     if (!entry.translation) throw new Error('这条记录还没有译文。');
     await clipboard.writeText(entry.translation.text);
-    lastFingerprint = createHash('sha256').update(entry.translation.text).digest('hex');
+    lastFingerprint = textFingerprint(entry.translation.text);
+    cancelClipboardAi();
     broadcast();
   }));
-  handle('remove', rawId => { store.remove(idSchema.parse(rawId)); broadcast(); });
-  handle('clear', rawAll => { store.clear(z.boolean().parse(rawAll)); broadcast(); });
+  handle('remove', rawId => {
+    const id = idSchema.parse(rawId);
+    store.remove(id);
+    if (aiJob?.sourceId === id || (clipboardAi?.state === 'ready' && clipboardAi.entryId === id)) cancelClipboardAi();
+    broadcast();
+  });
+  handle('clear', rawAll => { store.clear(z.boolean().parse(rawAll)); cancelClipboardAi(); broadcast(); });
   handle('create-category', rawName => { store.createCategory(z.string().parse(rawName)); broadcast(); });
   handle('delete-category', rawId => { store.deleteCategory(idSchema.parse(rawId)); broadcast(); });
   handle('assign-category', (rawId, rawCategoryId) => { store.assignCategory(idSchema.parse(rawId), idSchema.nullable().parse(rawCategoryId)); broadcast(); });
   handle('image', rawId => `data:image/png;base64,${store.readImage(idSchema.parse(rawId)).toString('base64')}`);
-  handle('settings', rawSettings => {
+  handle('settings', rawSettings => withClipboard(async () => {
     const { apiKey: newKey, clearApiKey, ...settings } = settingsSchema.parse(rawSettings);
     if (settings.shortcut === 'Super+V') throw new Error('Windows + V 由系统剪贴板占用，请选择其他组合。');
+    const previous = store.settings;
+    const endpointChanged = apiBaseUrl(previous.apiEndpoint) !== apiBaseUrl(settings.apiEndpoint);
+    const nextKey = newKey || (clearApiKey || endpointChanged ? '' : apiKey);
+    if (!nextKey) {
+      if (settings.clipboardAiMode !== 'off' && settings.clipboardAiMode !== previous.clipboardAiMode) throw new Error('请先填写 API 密钥，再开启剪贴板 AI 模式。');
+      settings.clipboardAiMode = 'off';
+    }
     let encryptedKey: string | undefined;
     if (newKey && canSecurelyStoreKey()) encryptedKey = safeStorage.encryptString(newKey).toString('base64');
-    const previous = store.settings.shortcut;
-    if (settings.shortcut !== previous || !shortcutRegistered) {
+    const changedShortcut = settings.shortcut !== previous.shortcut || !shortcutRegistered;
+    const previousRegistered = shortcutRegistered;
+    if (changedShortcut) {
       let registered = false;
       try { registered = globalShortcut.register(settings.shortcut, toggleWindow); } catch { /* invalid or unavailable */ }
       if (!registered) throw new Error('这个快捷键已被占用或当前系统不支持，请更换组合。');
-      if (settings.shortcut !== previous) globalShortcut.unregister(previous);
       shortcutRegistered = true;
     }
-    if (clearApiKey) { apiKey = ''; store.setEncryptedKey(undefined); }
-    if (newKey) { apiKey = newKey; store.setEncryptedKey(encryptedKey); }
-    store.updateSettings(settings); broadcast();
-  });
+    try { await applySettings(settings, nextKey, newKey || clearApiKey || endpointChanged ? { encryptedKey } : undefined); }
+    catch (error) {
+      if (changedShortcut) {
+        globalShortcut.unregister(settings.shortcut);
+        shortcutRegistered = previousRegistered;
+      }
+      throw error;
+    }
+    if (settings.shortcut !== previous.shortcut && previousRegistered) globalShortcut.unregister(previous.shortcut);
+  }));
   handle('translate', (rawId, rawLanguage) => {
     const id = idSchema.parse(rawId); const language = languageSchema.parse(rawLanguage); const entry = store.require(id);
     if (entry.kind === 'image') throw new Error('图片暂不支持文字识别，请选择文字记录进行翻译。');
@@ -324,7 +446,7 @@ if (!hasLock) app.quit();
 else {
   app.on('second-instance', openCompact);
   app.on('activate', openCompact);
-  app.on('before-quit', () => { quitting = true; if (timer) clearInterval(timer); if (focusTimer) clearInterval(focusTimer); globalShortcut.unregisterAll(); tray?.destroy(); focusService?.stop(); });
+  app.on('before-quit', () => { quitting = true; cancelClipboardAi(); if (timer) clearInterval(timer); if (focusTimer) clearInterval(focusTimer); globalShortcut.unregisterAll(); tray?.destroy(); focusService?.stop(); });
   void app.whenReady().then(async () => {
     app.setAppUserModelId('com.pasteboard.plus');
     store = new HistoryStore(app.getPath('userData'));
@@ -341,17 +463,17 @@ else {
     registerHandlers();
     try { shortcutRegistered = globalShortcut.register(store.settings.shortcut, toggleWindow); } catch { shortcutRegistered = false; }
     const icon = nativeImage.createFromPath(join(app.getAppPath(), 'assets/icon.png')).resize({ width: 22, height: 22 });
-    tray = new Tray(icon); tray.setToolTip('PasteBoard Plus · 你的灵感中转站'); tray.on('click', toggleWindow); updateTray();
+    tray = new Tray(icon); tray.setToolTip('PasteBoard Plus'); tray.on('click', toggleWindow); updateTray();
     await createWindow();
     let polling = false;
-    const poll = async () => {
+    const poll = async (allowAi = true) => {
       if (polling) return;
       polling = true;
-      try { await withClipboard(() => capture()); }
-      catch (error) { const message = error instanceof Error ? error.message : '读取剪贴板失败'; if (captureWarning !== message) { captureWarning = message; broadcast(); } }
+      try { await withClipboard(() => capture(false, allowAi)); }
+      catch (error) { reportCaptureError(error); }
       finally { polling = false; }
     };
-    void poll(); timer = setInterval(() => void poll(), 800);
+    void poll(false); timer = setInterval(() => void poll(), 800);
     let following = false;
     focusTimer = setInterval(async () => {
       const session = popupSession;

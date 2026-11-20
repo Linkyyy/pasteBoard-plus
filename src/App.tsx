@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
-import { AlignLeft, ArrowDownUp, ArrowLeft, ArrowRight, Check, CheckCheck, ChevronDown, ChevronRight, Clipboard, ClipboardCheck, Code2, Copy, Folder, FolderOpen, Globe2, Image as ImageIcon, Keyboard, LayoutGrid, List, LoaderCircle, Maximize2, Minus, MoreHorizontal, Pause, Pin, Play, Plus, Search, Settings2, ShieldCheck, Sparkles, Tag, Trash2, X } from 'lucide-react';
+import { AlignLeft, ArrowDownUp, ArrowLeft, ArrowRight, Check, CheckCheck, ChevronDown, Clipboard, ClipboardCheck, Code2, Copy, Folder, FolderOpen, Globe2, Image as ImageIcon, Keyboard, LayoutGrid, List, LoaderCircle, Maximize2, Minus, MoreHorizontal, Pause, Pin, Play, Plus, Search, Settings2, ShieldCheck, Sparkles, Tag, Trash2, X } from 'lucide-react';
 import { bridge } from './bridge';
 import CompactBoard from './CompactBoard';
+import AiSettings from './AiSettings';
+import { AiStatus } from './AiControls';
+import appIcon from '../assets/icon.png';
 import { titleOf } from '../shared/classify';
-import { DEFAULT_SETTINGS, LANGUAGES, type ClipboardEntry, type ContentKind, type Language, type SettingsInput, type Snapshot } from '../shared/types';
+import { AI_MODE_LABELS, AI_RESULT_LABELS, DEFAULT_SETTINGS, LANGUAGES, type ClipboardEntry, type ContentKind, type Language, type SettingsInput, type Snapshot } from '../shared/types';
 
 const kindLabels: Record<ContentKind, string> = { text: '文本', image: '图片', url: '链接', path: '文件路径', code: '代码' };
 const kindIcons = { text: AlignLeft, image: ImageIcon, url: Globe2, path: FolderOpen, code: Code2 };
@@ -56,7 +59,7 @@ function EntryCard({ entry, selected, layout, onSelect, onCopy, onPin, categoryN
         {entry.kind === 'url' ? <><p className="url-preview">{entry.content}</p><div className="link-caption"><Globe2 size={13} /> 网页链接 <ArrowRight size={13} /></div></> : entry.kind === 'path' ? <div className="path-preview"><Folder size={23} strokeWidth={1.5} /><p>{entry.content}</p></div> : <p className={`text-preview ${entry.kind === 'code' ? 'code-preview' : ''}`}>{entry.content}</p>}
       </div>}
     </button>
-    <div className="card-footer"><span className={`kind-dot ${entry.kind}`} /><span>{kindLabels[entry.kind]}</span>{categoryName && <span className="card-category">{categoryName}</span>}<span className="card-time">{relativeTime(entry.updatedAt)}</span><button className={`card-pin ${entry.pinned ? 'is-pinned' : ''}`} onClick={onPin} title={entry.pinned ? '取消置顶' : '置顶记录'} aria-label={entry.pinned ? '取消置顶' : '置顶记录'}><Pin size={13} fill={entry.pinned ? 'currentColor' : 'none'} /></button><button className="card-copy" onClick={onCopy} aria-label="复制记录" title="复制记录"><Copy size={14} /></button></div>
+    <div className="card-footer">{entry.aiResult ? <span className="ai-result-label"><Sparkles size={12} />{AI_RESULT_LABELS[entry.aiResult]}</span> : <><span className={`kind-dot ${entry.kind}`} /><span>{kindLabels[entry.kind]}</span></>}{categoryName && <span className="card-category">{categoryName}</span>}<span className="card-time">{relativeTime(entry.updatedAt)}</span><button className={`card-pin ${entry.pinned ? 'is-pinned' : ''}`} onClick={onPin} title={entry.pinned ? '取消置顶' : '置顶记录'} aria-label={entry.pinned ? '取消置顶' : '置顶记录'}><Pin size={13} fill={entry.pinned ? 'currentColor' : 'none'} /></button><button className="card-copy" onClick={onCopy} aria-label="复制记录" title="复制记录"><Copy size={14} /></button></div>
   </article>;
 }
 
@@ -76,10 +79,17 @@ function SettingsModal({ snapshot, initialTab, onClose, onSaved }: { snapshot: S
     finally { setSaving(false); }
   }
   return <div className="fluent-settings" role="dialog" aria-label="偏好设置" aria-modal="true">
-    <WindowHeader title="设置" onBack={onClose} backLabel="关闭弹窗" settings search={settingsSearch} searchLabel="搜索设置" placeholder="查找设置" onSearch={query => { setSettingsSearch(query); if (/api|翻译|语言|词库|模型|密钥/i.test(query)) setTab('ai'); else if (/快捷|历史|记录|图片|字体|粘贴|常规/i.test(query)) setTab('general'); }} />
-    <div className="fluent-settings-layout"><aside className="fluent-settings-nav"><div className="fluent-settings-profile"><img src="./icon.svg" alt="" /><div><strong>我的剪贴板</strong><span>PasteBoard Plus · 本机</span></div></div><button className={tab === 'general' ? 'active' : ''} onClick={() => { setTab('general'); setSettingsSearch(''); }}><Settings2 size={19} />常规与历史</button><button className={tab === 'ai' ? 'active' : ''} onClick={() => { setTab('ai'); setSettingsSearch(''); }}><Sparkles size={19} />翻译与词库</button><button onClick={onClose}><Clipboard size={19} />返回剪贴板</button><div className="fluent-settings-nav-footer"><ShieldCheck size={17} /><span>历史在本机保存<br />中英日本地词库已内置</span></div></aside><main className="fluent-settings-main"><div className="fluent-settings-page-title"><h1>{tab === 'general' ? '常规与历史' : '翻译与词库'}</h1><p>{tab === 'general' ? '自定义剪贴板的显示、快捷键和记录方式。' : '选择离线词库，或连接你自己的 AI 翻译服务。'}</p></div>
+    <WindowHeader title="设置" onBack={onClose} backLabel="关闭弹窗" settings search={settingsSearch} searchLabel="搜索设置" placeholder="查找设置" onSearch={query => { setSettingsSearch(query); if (/ai|api|作答|翻译|语言|词库|模型|密钥|deepseek|openai/i.test(query)) setTab('ai'); else if (/快捷|历史|记录|图片|字体|粘贴|常规/i.test(query)) setTab('general'); }} />
+    <div className="fluent-settings-layout">
+      <aside className="fluent-settings-nav">
+        <div className="fluent-settings-profile"><img src={appIcon} alt="" /><div><strong>PasteBoard Plus</strong><span>剪贴板设置</span></div></div>
+        <button className={tab === 'general' ? 'active' : ''} aria-current={tab === 'general' ? 'page' : undefined} onClick={() => { setTab('general'); setSettingsSearch(''); }}><Settings2 size={19} />常规与历史</button>
+        <button className={tab === 'ai' ? 'active' : ''} aria-current={tab === 'ai' ? 'page' : undefined} onClick={() => { setTab('ai'); setSettingsSearch(''); }}><Sparkles size={19} />AI 与翻译</button>
+        <button onClick={onClose}><Clipboard size={19} />返回剪贴板</button>
+      </aside>
+      <main className="fluent-settings-main"><div className="fluent-settings-page-title"><h1>{tab === 'general' ? '常规与历史' : 'AI 与翻译'}</h1></div>
     <div className="settings-body">{tab === 'general' ? <>
-      <div className="settings-section-title"><Keyboard size={18} /><div><h3>随时，唤起灵感</h3><p>在任何应用中，按下快捷键打开或收起剪贴板。</p></div></div>
+      <div className="settings-section-title"><Keyboard size={18} /><div><h3>快捷键</h3><p>在任何应用中，按下快捷键打开或收起剪贴板。</p></div></div>
       <label className="field-label">全局唤出快捷键</label><button className={`shortcut-recorder ${recording ? 'recording' : ''}`} onClick={() => setRecording(true)} onBlur={() => setRecording(false)} onKeyDown={event => {
         if (!recording) return;
         event.preventDefault(); event.stopPropagation();
@@ -93,21 +103,17 @@ function SettingsModal({ snapshot, initialTab, onClose, onSaved }: { snapshot: S
       <p className="field-help">Windows + V 由系统占用，建议使用 Ctrl + Shift + V。快捷键冲突时会提示更换。</p>
       {!bridge.isDesktop && <div className="inline-note"><Globe2 size={16} /> 浏览器预览不注册系统快捷键；桌面版支持全局唤出和自动记录。</div>}
       <div className="field-row"><div><label htmlFor="history-limit" className="field-label">历史记录容量</label><p className="field-help">默认无限条；自定义为 0 表示不限制。有限容量下会保留置顶。</p></div><div className="capacity-controls"><select id="history-limit" value={customCapacity ? 'custom' : input.historyLimit} onChange={event => { const custom = event.target.value === 'custom'; setCustomCapacity(custom); if (!custom) setInput({ ...input, historyLimit: Number(event.target.value) }); }}>{[0,50,100,300,500,1000,10000,100000].map(n => <option key={n} value={n}>{n === 0 ? '无限制（默认）' : `${n} 条`}</option>)}<option value="custom">自定义</option></select>{customCapacity && <input type="number" min="0" step="1" aria-label="自定义历史条数" value={input.historyLimit} onChange={event => setInput({ ...input, historyLimit: Number(event.target.value) })} />}</div></div>
-      <div className="field-row"><div><label className="field-label" htmlFor="capture-enabled">自动记录剪贴板</label><p className="field-help">只在本机保存；被来源应用标记为敏感的内容会跳过。</p></div><button id="capture-enabled" role="switch" aria-checked={input.captureEnabled} className={`toggle ${input.captureEnabled ? 'on' : ''}`} onClick={() => setInput({ ...input, captureEnabled: !input.captureEnabled })}><span /></button></div>
+      <div className="field-row"><div><label className="field-label" htmlFor="capture-enabled">自动记录剪贴板</label><p className="field-help">历史保存在本机。会跳过来源应用标记为敏感的内容。</p></div><button id="capture-enabled" role="switch" aria-checked={input.captureEnabled} className={`toggle ${input.captureEnabled ? 'on' : ''}`} onClick={() => setInput({ ...input, captureEnabled: !input.captureEnabled })}><span /></button></div>
       <div className="field-row"><div><label className="field-label" htmlFor="capture-images">记录图片</label><p className="field-help">默认关闭；开启后保存新复制的图片原图，不限制大小。</p></div><button id="capture-images" role="switch" aria-checked={input.captureImages} className={`toggle ${input.captureImages ? 'on' : ''}`} onClick={() => setInput({ ...input, captureImages: !input.captureImages })}><span /></button></div>
       <p className="field-help">文件及文件路径不会加入新的剪贴板历史。</p>
       <div className="field-row"><div><label className="field-label" htmlFor="auto-paste">自动粘贴到原输入框</label><p className="field-help">Windows：唤出时保留原焦点，点击词条后粘贴并收起。</p></div><button id="auto-paste" role="switch" aria-checked={input.autoPaste} className={`toggle ${input.autoPaste ? 'on' : ''}`} onClick={() => setInput({ ...input, autoPaste: !input.autoPaste })}><span /></button></div>
       <div className="field-row"><div><label className="field-label" htmlFor="font-size">文字大小</label><p className="field-help">调整小窗口词条文字，让内容更清晰。</p></div><select id="font-size" value={input.fontSize} onChange={event => setInput({ ...input, fontSize: Number(event.target.value) as 14 | 16 | 18 })}><option value="14">标准 · 14</option><option value="16">较大 · 16</option><option value="18">大 · 18</option></select></div>
-    </> : <>
-      <div className="settings-section-title"><Sparkles size={18} /><div><h3>让文字，跨越语言</h3><p>连接兼容 OpenAI Chat Completions 的 API 服务。</p></div></div>
-      <div className="dictionary-status"><Globe2 size={25} /><div><strong>TypeLingo 中英日词库</strong><span>32,159 条六向查询记录 · 离线可用</span><p>仅按词条精确匹配；歧义词不会自动选义。未命中可配置 AI 翻译整句。</p></div></div>
-      <div className="two-fields"><div><label className="field-label" htmlFor="translation-mode">翻译方式</label><select id="translation-mode" value={input.translationMode} onChange={event => setInput({ ...input, translationMode: event.target.value as SettingsInput['translationMode'] })}><option value="auto">自动：有 API 用 AI，否则本地词库</option><option value="local">仅本地词库（离线）</option><option value="ai">仅 AI API</option></select></div><div><label className="field-label" htmlFor="source-language">原文语言</label><select id="source-language" value={input.sourceLanguage} onChange={event => setInput({ ...input, sourceLanguage: event.target.value as SettingsInput['sourceLanguage'] })}><option value="auto">自动检测</option><option value="zh-CN">简体中文</option><option value="en">英语</option><option value="ja">日语</option></select></div></div>
-      <label className="field-label" htmlFor="api-endpoint">API 服务地址</label><input id="api-endpoint" type="url" value={input.apiEndpoint} onChange={event => setInput({ ...input, apiEndpoint: event.target.value })} placeholder="https://api.openai.com/v1" spellCheck={false} /><p className="field-help">填写以 /v1 结尾的基础地址。支持 HTTPS 和本地 HTTP 服务。</p>
-      <div className="two-fields"><div><label className="field-label" htmlFor="api-model">模型名称</label><input id="api-model" value={input.apiModel} onChange={event => setInput({ ...input, apiModel: event.target.value })} placeholder="gpt-4o-mini" spellCheck={false} /></div><div><label className="field-label" htmlFor="target-language">默认目标语言</label><select id="target-language" value={input.targetLanguage} onChange={event => setInput({ ...input, targetLanguage: event.target.value as Language })}>{Object.entries(LANGUAGES).map(([code, label]) => <option value={code} key={code}>{label}</option>)}</select></div></div>
-      <div className="field-label-row"><label className="field-label" htmlFor="api-key">API 密钥</label>{snapshot.hasApiKey && !input.clearApiKey && <button className="text-button danger" onClick={() => setInput({ ...input, clearApiKey: true, apiKey: '' })}>移除已存密钥</button>}</div><input id="api-key" type="password" autoComplete="off" value={input.apiKey || ''} onChange={event => setInput({ ...input, apiKey: event.target.value, clearApiKey: false })} placeholder={input.clearApiKey ? '保存后移除密钥' : snapshot.hasApiKey ? '已配置 · 留空保留原密钥' : '输入你的 API Key'} />
-      <div className="privacy-note"><ShieldCheck size={18} /><div><strong>{snapshot.keyStorage === 'secure' ? '密钥使用系统安全存储加密' : '当前环境仅在本次会话保存密钥'}</strong><p>只有点击翻译时，选中的文字才会发送到你配置的服务。{snapshot.keyStorage === 'session' ? '系统安全存储不可用，退出后需要重新填写密钥。' : '密钥不会发送给其他服务，也不会写入历史记录。'}图片暂不支持 OCR。</p></div></div>
-    </>}{error && <div className="form-error" role="alert">{error}</div>}</div>
-    <div className="modal-footer fluent-settings-footer"><span><ShieldCheck size={14} /> 未配置 API 时使用本地词库</span><button className="button secondary" onClick={onClose}>取消</button><button className="button primary" disabled={saving} onClick={() => void save()}>{saving && <LoaderCircle size={15} className="spin" />}保存设置</button></div></main></div>
+    </> : <AiSettings input={input} snapshot={snapshot} onChange={setInput} />}</div>
+    <div className="modal-footer fluent-settings-footer">
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <button className="button secondary" onClick={onClose}>取消</button>
+      <button className="button primary" disabled={saving} onClick={() => void save()}>{saving && <LoaderCircle size={15} className="spin" />}保存设置</button>
+    </div></main></div>
   </div>;
 }
 
@@ -208,20 +214,34 @@ export default function App() {
   return <div className="application fluent-manager">
     <WindowHeader title="剪贴板" onBack={() => void run(() => bridge.setWindowMode('compact'))} backLabel="返回小窗口" search={search} onSearch={setSearch} searchLabel="搜索历史记录" placeholder="搜索内容、链接或译文…" inputRef={searchRef} />
     <div className="workspace">
-      <aside className="sidebar"><div className="workspace-label"><img src="./icon.svg" alt="" /><div><strong>我的剪贴板</strong><span>PasteBoard Plus · 本机</span></div></div>
+      <aside className="sidebar"><div className="workspace-label"><img src={appIcon} alt="" /><div><strong>PasteBoard Plus</strong><span>本机历史</span></div></div>
         <div className="navigation"><span className="section-label">工作空间</span>{navItem('all', '所有记录', <LayoutGrid size={17} />, entries.length)}{navItem('pinned', '置顶收藏', <Pin size={17} />, pinnedCount)}
           <span className="section-label category-label">智能分类</span>{Object.entries(kindLabels).map(([kind, label]) => { const Icon = kindIcons[kind as ContentKind]; return navItem(kind, label, <Icon size={17} />, counts[kind]); })}
           <div className="section-label custom-label">我的分类<button className="sidebar-add" onClick={() => { setCategoryModal(true); setCategoryError(''); setCategoryName(''); }} aria-label="新建分类"><Plus size={15} /></button></div>
           {categories.map(category => navItem(`category:${category.id}`, category.name, <span className="category-dot" style={{ background: category.color }} />, entries.filter(entry => entry.categoryId === category.id).length))}
           {!categories.length && <button className="empty-category" onClick={() => setCategoryModal(true)}><Plus size={14} /> 创建你的第一个分类</button>}
         </div>
-        <div className="sidebar-bottom"><div className="storage-info"><span>本地历史记录</span><strong>{entries.length}<span> / {settings.historyLimit === 0 ? '∞' : settings.historyLimit}</span></strong><div className="storage-track"><div style={{ width: `${Math.min(100, (settings.historyLimit === 0 ? 0 : (entries.length - pinnedCount) / settings.historyLimit * 100))}%` }} /></div><p><ShieldCheck size={12} /> 本地存储，安心留存</p></div><button className="sidebar-settings" onClick={() => setSettingsTab('general')}><Settings2 size={17} /> 偏好设置<span>{bridge.platform === 'darwin' ? '⌘' : 'Ctrl'} ,</span></button></div>
+        <div className="sidebar-bottom"><div className="storage-info"><span>本地历史记录</span><strong>{entries.length}<span> / {settings.historyLimit === 0 ? '∞' : settings.historyLimit}</span></strong><div className="storage-track"><div style={{ width: `${Math.min(100, (settings.historyLimit === 0 ? 0 : (entries.length - pinnedCount) / settings.historyLimit * 100))}%` }} /></div></div><button className="sidebar-settings" onClick={() => setSettingsTab('ai')} aria-label="AI 与翻译设置"><Sparkles size={17} /> AI 与翻译<span>{bridge.isDesktop && AI_MODE_LABELS[snapshot.hasApiKey ? settings.clipboardAiMode : 'off']}</span></button><button className="sidebar-settings" onClick={() => setSettingsTab('general')}><Settings2 size={17} /> 偏好设置<span>{bridge.platform === 'darwin' ? '⌘' : 'Ctrl'} ,</span></button></div>
       </aside>
 
-      <main className="main-panel"><div className="main-heading"><div className="breadcrumb">工作空间 <ChevronRight size={12} /> 剪贴板</div><div className="heading-row"><div><h1>{filterLabel}<span className="heading-count">{filtered.length}</span></h1><p>留住刚刚复制的，也留住转瞬即逝的灵感。</p></div><button className="button secondary capture-button" onClick={() => void run(async () => { const result = await bridge.capture(); notify(result.message); })}><Plus size={16} /> 捕获剪贴板</button></div>
-        <div className="toolbar"><span className="manager-toolbar-label">历史记录 <span>· {filtered.length} 条</span></span><div className="layout-switch"><button className={layout === 'grid' ? 'active' : ''} onClick={() => setLayout('grid')} aria-label="网格视图"><LayoutGrid size={16} /></button><button className={layout === 'list' ? 'active' : ''} onClick={() => setLayout('list')} aria-label="列表视图"><List size={17} /></button></div><details className="more-menu"><summary aria-label="更多操作"><MoreHorizontal size={20} /></summary><div><button onClick={() => { setClearModal(true); setClearPinned(false); }}><Trash2 size={15} /> 清理历史记录</button>{currentCategory && <button onClick={() => setDeleteCategoryModal(true)}><Tag size={15} /> 删除当前分类</button>}</div></details></div>
-      </div>
+      <main className="main-panel">
+        <div className="main-heading">
+          <div className="heading-row">
+            <h1>{filterLabel}<span className="heading-count">{filtered.length}</span></h1>
+            <div className="manager-view-actions">
+              <button className="button secondary capture-button" onClick={() => void run(async () => { const result = await bridge.capture(); notify(result.message); })}><Plus size={16} /> 捕获剪贴板</button>
+              <div className="layout-switch">
+                <button className={layout === 'grid' ? 'active' : ''} aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')} aria-label="网格视图"><LayoutGrid size={16} /></button>
+                <button className={layout === 'list' ? 'active' : ''} aria-pressed={layout === 'list'} onClick={() => setLayout('list')} aria-label="列表视图"><List size={17} /></button>
+              </div>
+              <details className="more-menu"><summary aria-label="更多操作"><MoreHorizontal size={20} /></summary>
+                <div><button onClick={() => { setClearModal(true); setClearPinned(false); }}><Trash2 size={15} /> 清理历史记录</button>{currentCategory && <button onClick={() => setDeleteCategoryModal(true)}><Tag size={15} /> 删除当前分类</button>}</div>
+              </details>
+            </div>
+          </div>
+        </div>
         {snapshot.warning && <div className="warning-banner" role="alert">{snapshot.warning}</div>}
+        <AiStatus status={snapshot.clipboardAi} />
         {!bridge.isDesktop && <div className="browser-banner"><Globe2 size={14} /><span>浏览器预览 · 历史仅保存在此浏览器；自动监听和全局快捷键请使用桌面版。</span>{entries.length === 0 && <button onClick={() => void run(() => bridge.loadExamples!())}>查看示例 <ArrowRight size={13} /></button>}</div>}
         <div className="records-scroll"><div className="records-subheading"><span>{search ? '搜索结果' : filter === 'pinned' ? '重要的，值得留下' : '最近记录'}<span className="subheading-dot">·</span>{filtered.length} 条</span><label className="sort-control"><ArrowDownUp size={13} /><select aria-label="排序方式" value={sort} onChange={event => setSort(event.target.value)}><option value="recent">最新在前</option><option value="oldest">最早在前</option></select></label></div>
           {!loaded ? <div className="empty-state"><LoaderCircle className="spin" size={26} /><h2>正在打开你的剪贴板…</h2></div> : filtered.length ? <div className={`entries ${layout}`}>{filtered.slice(0, visibleCount).map(entry => <EntryCard key={entry.id} entry={entry} selected={selected?.id === entry.id} layout={layout} categoryName={categories.find(category => category.id === entry.categoryId)?.name} onSelect={() => { setSelectedId(entry.id); setDetailTab('original'); setDetailOpen(true); }} onCopy={() => void run(() => bridge.copy(entry.id), '已复制到剪贴板')} onPin={() => void run(() => bridge.pin(entry.id), entry.pinned ? '已取消置顶' : '已置顶，清理时会保留')} />)}</div> : <div className="empty-state"><div className="empty-illustration"><div className="empty-paper back" /><div className="empty-paper front"><Clipboard size={32} strokeWidth={1.3} /><span /><span /></div><span className="empty-spark">✦</span></div><span className="eyebrow">A LITTLE SPACE FOR YOUR IDEAS</span><h2>{search ? '还没有找到这段灵感' : filter !== 'all' ? '这个分类，还在等待灵感' : '下一次复制，从这里开始'}</h2><p>{search ? '换个关键词试试，或搜索译文中的内容。' : bridge.isDesktop ? '复制文字、链接或图片，它们会自动出现在这里。\n不用整理，也不会轻易丢失。' : '在桌面版中，每次复制都会自动留存。\n现在可以捕获一段文字，或载入示例体验界面。'}</p>{search ? <button className="button secondary" onClick={() => setSearch('')}>清空搜索</button> : !bridge.isDesktop && entries.length === 0 ? <button className="button primary" onClick={() => void run(() => bridge.loadExamples!())}>体验示例 <ArrowRight size={15} /></button> : <div className="empty-shortcut"><span>随时唤出</span><Shortcut value={settings.shortcut} small /></div>}</div>}

@@ -8,11 +8,29 @@ import { join, resolve } from 'node:path';
 if (!process.env.DISPLAY && process.platform === 'linux') throw new Error('Set DISPLAY to an X11 desktop, or run with xvfb-run -a npm run test:desktop.');
 const data = await mkdtemp(join(tmpdir(), 'pasteboard-desktop-'));
 const requests = [];
+const replies = new Map([
+  ['What is 3 + 4?', '3 + 4 = 7.'],
+  ['What is the old answer?', 'This response was superseded.'],
+  ['What is the current answer?', 'This response is current.'],
+  ['Good morning. See you tomorrow!', 'おはようございます。また明日！'],
+  ['What is the capital of Japan?', 'Tokyo.'],
+]);
+const heldReplies = new Map();
+function holdReply(text) {
+  let release;
+  heldReplies.set(text, new Promise(resolve => { release = resolve; }));
+  return () => { heldReplies.delete(text); release(); };
+}
 const server = createServer(async (req, res) => {
   let raw = ''; for await (const chunk of req) raw += chunk;
-  requests.push({ url: req.url, method: req.method, auth: req.headers.authorization, body: JSON.parse(raw) });
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ choices: [{ message: { content: '你好，创作的世界。' }, finish_reason: 'stop' }] }));
+  const body = JSON.parse(raw);
+  requests.push({ url: req.url, method: req.method, auth: req.headers.authorization, body });
+  const text = body.messages[1].content;
+  await heldReplies.get(text);
+  const status = text === 'A request with no quota.' ? 429 : 200;
+  const content = replies.get(text) || '你好，创作的世界。';
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(status === 200 ? { choices: [{ message: { content }, finish_reason: 'stop' }] } : { error: 'Example provider body' }));
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const endpoint = `http://127.0.0.1:${server.address().port}/v1`;
@@ -179,7 +197,7 @@ try {
     const s = await window.pasteboard.getSnapshot();
     await window.pasteboard.assignCategory(id, s.categories[0].id);
     await window.pasteboard.pin(id);
-    await window.pasteboard.saveSettings({ ...s.settings, apiEndpoint: endpoint, apiKey: 'test-only-not-a-real-key' });
+    await window.pasteboard.saveSettings({ ...s.settings, apiEndpoint: `${endpoint}/chat/completions`, apiKey: 'test-only-not-a-real-key' });
   }, { id: text.id, endpoint });
   await page.getByRole('button', { name: '查看：Hello, creative world.' }).click();
   await page.getByRole('button', { name: '翻译这段内容' }).click();
@@ -198,6 +216,97 @@ try {
   console.log('PASS complete translation UI → IPC → local API → persisted result → copy flow; key never exposed in history/snapshot');
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/desktop.png' });
+
+  await page.evaluate(() => window.pasteboard.setWindowMode('compact'));
+  const modes = page.getByRole('group', { name: '剪贴板 AI 模式' });
+  await writeText('Clipboard contents before enabling AI.');
+  await modes.getByRole('button', { name: '作答', exact: true }).click();
+  await until(s => s.settings.clipboardAiMode === 'answer', 'enable answer mode');
+  const question = 'What is 3 + 4?';
+  const releaseAnswer = holdReply(question);
+  await writeText(question);
+  await page.getByText('正在处理新复制的文字…').waitFor();
+  assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), question);
+  releaseAnswer();
+  const answered = await until(s => s.clipboardAi?.state === 'ready', 'automatic answer');
+  const answer = answered.entries[0];
+  assert.equal(answer.content, replies.get(question));
+  assert.equal(answer.aiResult, 'answer');
+  assert(answered.entries.some(entry => entry.content === question && !entry.aiResult), 'The original question stays in history');
+  assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), answer.content);
+  await page.getByTestId('compact-record').first().getByText('AI 答案').waitFor();
+  await page.getByText('结果已复制，可以直接粘贴').waitFor();
+  assert.deepEqual(requests.slice(1).map(({ body }) => body.messages[1].content), [question]);
+  assert.match(requests[1].body.messages[0].content, /Answer the user's question/);
+  await page.screenshot({ path: 'test-results/desktop-ai-answer.png' });
+  await page.evaluate(() => window.pasteboard.setWindowMode('manager'));
+  const pasteTarget = page.getByRole('textbox', { name: '搜索历史记录' });
+  await pasteTarget.press(process.platform === 'darwin' ? 'Meta+V' : 'Control+V');
+  assert.equal(await pasteTarget.inputValue(), answer.content);
+  await pasteTarget.fill('');
+  await page.evaluate(() => window.pasteboard.setWindowMode('compact'));
+  await page.evaluate(id => window.pasteboard.copy(id), answer.id);
+
+  const oldQuestion = 'What is the old answer?';
+  const newQuestion = 'What is the current answer?';
+  const releaseOld = holdReply(oldQuestion);
+  await writeText(oldQuestion);
+  await until(s => s.clipboardAi?.state === 'working' && requests.some(({ body }) => body.messages[1].content === oldQuestion), 'older pending answer');
+  await writeText(newQuestion);
+  await until(s => s.clipboardAi?.state === 'ready' && s.entries[0]?.content === replies.get(newQuestion), 'newer answer wins');
+  releaseOld();
+  assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), replies.get(newQuestion));
+  assert.equal((await state()).entries.some(entry => entry.content === replies.get(oldQuestion)), false);
+
+  // New sensitive clipboard content must survive a reply already in flight.
+  const pendingQuestion = 'What is the capital of Japan?';
+  const releasePending = holdReply(pendingQuestion);
+  await writeText(pendingQuestion);
+  await until(s => s.clipboardAi?.state === 'working' && requests.some(({ body }) => body.messages[1].content === pendingQuestion), 'pending answer before a sensitive copy');
+  const sensitive = 'private clipboard fixture';
+  await desktop.evaluate(async ({ clipboard, ClipboardItem }, text) => {
+    await clipboard.write([new ClipboardItem({ 'text/plain': text,
+      'electron application/osclipboard;format="org.nspasteboard.ConcealedType"': new Blob(['1']) })]);
+  }, sensitive);
+  releasePending();
+  await until(s => s.clipboardAi?.state === 'ready' && !s.clipboardAi.clipboardUpdated, 'save late result without overwriting newer clipboard');
+  assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), sensitive);
+  assert.equal((await state()).entries[0].content, replies.get(pendingQuestion));
+
+  await page.getByRole('button', { name: '切换翻译目标语言' }).click();
+  await page.getByRole('group', { name: '翻译目标语言' }).getByRole('button', { name: '日语', exact: true }).click();
+  await until(s => s.settings.targetLanguage === 'ja', 'choose Japanese');
+  await modes.getByRole('button', { name: '翻译', exact: true }).click();
+  await until(s => s.settings.clipboardAiMode === 'translate', 'enable translation mode');
+  const phrase = 'Good morning. See you tomorrow!';
+  await writeText(phrase);
+  const translated = await until(s => s.clipboardAi?.state === 'ready' && s.entries[0]?.aiResult === 'translate', 'automatic translation');
+  assert.equal(translated.entries[0].content, replies.get(phrase));
+  assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), replies.get(phrase));
+  const translationRequest = requests.find(({ body }) => body.messages[1].content === phrase);
+  assert.match(translationRequest.body.messages[0].content, /日语/);
+  assert.equal(requests.some(({ body }) => body.messages[1].content === sensitive), false);
+  assert.deepEqual(requests.slice(1).map(({ body }) => body.messages[1].content), [question, oldQuestion, newQuestion, pendingQuestion, phrase]);
+  await page.getByRole('button', { name: '译文', exact: true }).click();
+  await page.getByTestId('compact-record').first().getByText('AI 译文').waitFor();
+
+  const quotaQuestion = 'A request with no quota.';
+  await writeText(quotaQuestion);
+  await page.getByRole('alert').getByText('请求过于频繁或额度不足，请稍后重试。').waitFor();
+  assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), quotaQuestion);
+  assert.equal((await state()).entries[0].content, quotaQuestion);
+  await modes.getByRole('button', { name: '关闭', exact: true }).click();
+  await until(s => s.settings.clipboardAiMode === 'off', 'turn AI off');
+  await writeText('Clipboard contents after disabling AI.');
+  await until(s => s.entries[0]?.content === 'Clipboard contents after disabling AI.', 'normal capture after disabling AI');
+  assert.equal(requests.length, 7);
+  console.log('PASS AI mode controls, answers and translations in separate history entries and system clipboard, latest copy wins, sensitive copies and failures are preserved');
+
+  await page.evaluate(async () => {
+    const { settings } = await window.pasteboard.getSnapshot();
+    await window.pasteboard.saveSettings({ ...settings, apiEndpoint: 'https://api.deepseek.com/v1', apiModel: 'deepseek-chat' });
+  });
+  assert.equal((await state()).hasApiKey, false, 'Changing API endpoints must clear an unreplaced key');
   await page.evaluate(() => window.pasteboard.windowAction('hide'));
   assert.equal(await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), false);
   await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].show());
@@ -207,6 +316,8 @@ try {
   const restored = current.entries.find(entry => entry.id === text.id);
   assert.equal(restored.pinned, true); assert.equal(restored.categoryId, current.categories[0].id);
   assert.equal(restored.translation.text, '你好，创作的世界。');
+  assert.equal(current.entries.find(entry => entry.id === answer.id).aiResult, 'answer');
+  assert.equal(current.entries.find(entry => entry.id === translated.entries[0].id).aiResult, 'translate');
   assert.equal(current.settings.shortcut, 'CommandOrControl+Alt+P');
   assert.equal(current.entries.find(entry => entry.id === image.id).image.width, 256);
   for (const id of largeImages) assert(current.entries.some(entry => entry.id === id), 'Large original images survive restart');

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileS
 import { join } from 'node:path';
 import { z } from 'zod';
 import { classify } from '../shared/classify';
-import { DEFAULT_SETTINGS, type Category, type ClipboardEntry, type Settings, type Translation } from '../shared/types';
+import { DEFAULT_SETTINGS, type AiResult, type Category, type ClipboardEntry, type Settings, type Translation } from '../shared/types';
 import { settingsSchema } from './schema';
 
 const entrySchema = z.object({
@@ -12,6 +12,7 @@ const entrySchema = z.object({
   categoryId: z.string().uuid().nullable(), copyCount: z.number().int().nonnegative(),
   image: z.object({ thumbnail: z.string(), width: z.number().positive(), height: z.number().positive(), bytes: z.number().positive() }).optional(),
   translation: z.object({ text: z.string().max(100_000), language: z.enum(['zh-CN', 'en', 'ja', 'ko', 'de', 'fr']), createdAt: z.number(), provider: z.enum(['local', 'ai']).optional() }).optional(),
+  aiResult: z.enum(['answer', 'translate']).optional(),
   hash: z.string(),
 });
 const dataSchema = z.object({
@@ -50,38 +51,54 @@ export class HistoryStore {
   }
   get settings() { return { ...this.data.settings }; }
   get encryptedKey() { return this.data.encryptedKey; }
-  setEncryptedKey(value?: string) { this.data.encryptedKey = value; this.save(); }
   get categories() { return this.data.categories.map(category => ({ ...category })); }
   get entries(): ClipboardEntry[] {
     return this.data.entries.map(({ hash: _, ...entry }) => ({ ...entry }));
   }
   get(id: string) { return this.data.entries.find(entry => entry.id === id); }
-  private save() {
+  private save(data = this.data) {
     const temp = `${this.file}.tmp`;
-    writeFileSync(temp, JSON.stringify(this.data), { mode: 0o600 });
+    writeFileSync(temp, JSON.stringify(data), { mode: 0o600 });
     renameSync(temp, this.file);
   }
-  updateSettings(settings: Settings) { this.data.settings = { ...settings }; this.prune(); this.save(); }
+  updateSettings(settings: Settings, keyUpdate?: { encryptedKey: string | undefined }) {
+    const next = { ...this.data, settings: { ...settings }, ...keyUpdate };
+    const removed = this.trimEntries(next);
+    this.save(next);
+    this.data = next;
+    for (const entry of removed) {
+      try { this.deleteImage(entry); }
+      catch { this.warning = '部分超出容量的图片文件未能清理。'; }
+    }
+  }
   addText(content: string) {
     if (!content.trim()) return false;
     if (content.length > 100_000) throw new Error('这段文字超过 100,000 字，未保存。');
     return this.add({ content, kind: classify(content), hash: createHash('sha256').update(`text:${content}`).digest('hex') });
   }
+  addAiResult(content: string, aiResult: AiResult) {
+    const kind = classify(content);
+    return this.add({ content, kind: kind === 'path' ? 'text' : kind, aiResult,
+      hash: createHash('sha256').update(`ai:${aiResult}:${content}`).digest('hex') });
+  }
   addImage(png: Buffer, thumbnail: string, width: number, height: number) {
     return this.add({ content: '', kind: 'image', hash: createHash('sha256').update(png).digest('hex'),
       image: { thumbnail, width, height, bytes: png.length } }, png);
   }
-  private add(input: Pick<StoredEntry, 'content' | 'kind' | 'hash' | 'image'>, png?: Buffer) {
+  private add(input: Pick<StoredEntry, 'content' | 'kind' | 'hash' | 'image' | 'aiResult'>, png?: Buffer) {
     const existing = this.data.entries.find(entry => entry.hash === input.hash);
+    const now = Date.now();
+    const entry = existing ?? { ...input, id: randomUUID(), createdAt: now, updatedAt: now, pinned: false, categoryId: null, copyCount: 0 };
     if (existing) {
-      existing.updatedAt = Date.now();
-      this.data.entries = [existing, ...this.data.entries.filter(entry => entry.id !== existing.id)];
-    } else {
-      const entry: StoredEntry = { ...input, id: randomUUID(), createdAt: Date.now(), updatedAt: Date.now(), pinned: false, categoryId: null, copyCount: 0 };
-      if (png) writeFileSync(join(this.imageDir, `${entry.id}.png`), png, { mode: 0o600 });
-      this.data.entries.unshift(entry);
+      entry.updatedAt = now;
+      this.data.entries = this.data.entries.filter(item => item.id !== entry.id);
+    } else if (png) {
+      writeFileSync(join(this.imageDir, `${entry.id}.png`), png, { mode: 0o600 });
     }
-    this.prune(); this.save(); return true;
+    this.data.entries.unshift(entry);
+    this.prune();
+    this.save();
+    return entry.id;
   }
   private deleteImage(entry: StoredEntry) {
     if (entry.kind === 'image') {
@@ -89,14 +106,19 @@ export class HistoryStore {
       if (existsSync(path)) unlinkSync(path);
     }
   }
-  private prune() {
-    if (this.data.settings.historyLimit === 0) return;
+  private trimEntries(data: Data) {
+    const removed: StoredEntry[] = [];
+    if (data.settings.historyLimit === 0) return removed;
     let count = 0;
-    this.data.entries = this.data.entries.filter(entry => {
-      const keep = entry.pinned || ++count <= this.data.settings.historyLimit;
-      if (!keep) this.deleteImage(entry);
+    data.entries = data.entries.filter(entry => {
+      const keep = entry.pinned || ++count <= data.settings.historyLimit;
+      if (!keep) removed.push(entry);
       return keep;
     });
+    return removed;
+  }
+  private prune() {
+    for (const entry of this.trimEntries(this.data)) this.deleteImage(entry);
   }
   togglePin(id: string) {
     const entry = this.require(id);

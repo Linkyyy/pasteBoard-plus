@@ -1,8 +1,8 @@
 {
   "name": "pasteboard-plus",
   "productName": "PasteBoard Plus",
-  "version": "0.1.5",
-  "description": "A thoughtful clipboard companion with collections and AI translation.",
+  "version": "0.1.6",
+  "description": "Clipboard history with automatic AI answers and translations.",
   "author": "PasteBoard Plus",
   "license": "MIT",
   "private": true,
@@ -69,7 +69,8 @@
         "nsis",
         "zip"
       ],
-      "signAndEditExecutable": false,
+      "icon": "build/icon.ico",
+      "signExecutable": false,
       "artifactName": "PasteBoard-Plus-${version}-win-${arch}.${ext}"
     },
     "nsis": {
@@ -81,6 +82,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
       "shortcutName": "PasteBoard Plus",
       "artifactName": "PasteBoard-Plus-Setup-${version}-${arch}.${ext}"
     },

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -31,11 +31,26 @@ describe('persistent history', () => {
     const store = new HistoryStore(directory); store.addText('previous version');
     const file = join(directory, 'history.json'); const raw = JSON.parse(readFileSync(file, 'utf8'));
     delete raw.settings.captureImages; raw.settings.historyLimit = oldLimit;
+    delete raw.settings.clipboardAiMode;
     writeFileSync(file, JSON.stringify(raw));
     const restored = new HistoryStore(directory);
     expect(restored.entries[0].content).toBe('previous version');
     expect(restored.settings.historyLimit).toBe(expected);
     expect(restored.settings.captureImages).toBe(false);
+    expect(restored.settings.clipboardAiMode).toBe('off');
+  });
+  it('retains the original API settings, credentials and images if a settings write fails', () => {
+    const store = new HistoryStore(directory);
+    const original = store.settings;
+    store.updateSettings(original, { encryptedKey: 'original-key-fixture' });
+    const image = Buffer.from('image fixture');
+    const id = store.addImage(image, 'data:image/png;base64,aW1hZ2U=', 10, 10);
+    store.addText('latest text');
+    mkdirSync(join(directory, 'history.json.tmp'));
+    expect(() => store.updateSettings({ ...original, apiEndpoint: 'https://api.deepseek.com/v1', historyLimit: 1 }, { encryptedKey: undefined })).toThrow();
+    expect(store.settings).toEqual(original);
+    expect(store.encryptedKey).toBe('original-key-fixture');
+    expect(store.readImage(id)).toEqual(image);
   });
 
   it('restores text, pinned state, categories, and translation after reopening', () => {
