@@ -18,7 +18,7 @@ const output = join(directory, 'dist');
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(join(directory, 'public'), output, { recursive: true });
-await cp(join(directory, '../assets/icon.png'), join(output, 'icon.png'));
+await cp(join(directory, '../public/icon.svg'), join(output, 'icon.svg'));
 const template = await readFile(join(directory, 'public/index.html'), 'utf8');
 const html = template.replace(/\{\{([A-Z_]+)\}\}/g, (_, token) => {
   if (!(token in replacements)) throw new Error(`Unknown template token ${token}`);

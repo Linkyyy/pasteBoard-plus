@@ -1,5 +1,5 @@
 /* Shared Windows 11 chrome. Keep the search input independent of form-field rules. */
-.fluent-window-caption{height:56px;flex-shrink:0;display:grid;grid-template-columns:240px minmax(0,1fr) 144px;align-items:center;background:#eef2f8;color:#202633;-webkit-app-region:drag;user-select:none;z-index:5}
+.fluent-window-caption{height:56px;flex-shrink:0;display:grid;grid-template-columns:240px minmax(0,1fr) 144px;align-items:center;background:#f4f1f3;color:#202020;-webkit-app-region:drag;user-select:none;z-index:5}
 .fluent-window-label{display:flex;align-items:center;gap:16px;padding-left:17px;font-size:14px;min-width:0}
 .fluent-window-label>button{display:grid;place-items:center;width:32px;height:32px;border-radius:4px;color:#424242;-webkit-app-region:no-drag}
 .fluent-window-label>button:hover{background:#00000008}
@@ -21,8 +21,7 @@
 .fluent-settings button:focus-visible,.fluent-manager button:focus-visible,.fluent-manager summary:focus-visible{outline-color:#0067c0}
 
 /* Management uses the same shell, profile, navigation, and surfaces as Settings. */
-.fluent-manager,.fluent-settings{background:#f0f3f8;color:#202633;--accent:#2455bc}
-.fluent-manager{--sidebar:240px;--detail:336px;--muted:#606a7c}
+.fluent-manager{background:#f4f1f3;color:#202020;--sidebar:240px;--detail:336px;--accent:#0067c0;--muted:#666}
 .fluent-manager .workspace,.fluent-manager .main-panel{background:transparent}
 .fluent-manager .sidebar{width:var(--sidebar);padding:22px 13px 16px;background:transparent;box-shadow:none;gap:0}
 .fluent-manager .workspace-label{padding:0 7px 30px;gap:12px}
@@ -33,7 +32,7 @@
 .fluent-manager .section-label:first-child{margin-top:0}
 .fluent-manager .nav-item{height:43px;padding:0 15px;margin:2px 0;gap:13px;color:#333;border-radius:5px;font-size:14px;position:relative;font-weight:400;box-shadow:none}
 .fluent-manager .nav-item:hover{background:#00000005}
-.fluent-manager .nav-item.active,.fluent-settings-nav>button.active{background:#e2e9f7;color:#202633}
+.fluent-manager .nav-item.active{background:#eae6e9;color:#202020}
 .fluent-manager .nav-item.active:before{content:"";position:absolute;left:0;top:12px;height:18px;width:3px;background:#0067c0;border-radius:2px}
 .fluent-manager .nav-item.active .nav-icon{color:#0067c0}
 .fluent-manager .nav-item.active .nav-count{background:transparent;color:#555;font-weight:400}
@@ -47,16 +46,17 @@
 .fluent-manager .storage-track{background:#ddd8de;height:3px;margin-block:10px}
 .fluent-manager .storage-track>div{background:#0067c0}
 .fluent-manager .sidebar-settings{font-size:14px;gap:13px;border-radius:5px;color:#333;box-shadow:none;margin-top:8px}
-.fluent-manager .sidebar-settings:hover{background:#e2e9f7}
+.fluent-manager .sidebar-settings:hover{background:#eae6e9}
 .fluent-manager .sidebar-settings>span{font-size:11px;color:#777}
-.fluent-manager .main-heading{padding:24px 28px 14px;background:transparent;box-shadow:none}
-.fluent-manager .heading-row{flex-wrap:wrap;gap:10px}
-.manager-view-actions{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0}
+.fluent-manager .main-heading{padding:24px 28px 0;background:transparent;box-shadow:none}
 .fluent-manager .breadcrumb{font-size:12px;color:#666;margin-bottom:11px}
-.fluent-manager .heading-row h1{font-size:28px;font-weight:600;letter-spacing:-.5px;color:#202633}
-.fluent-manager .heading-count{font-size:13px;background:#e2e9f7;color:#526380;padding:3px 9px;border-radius:5px}
+.fluent-manager .heading-row h1{font-size:28px;font-weight:600;letter-spacing:-.5px;color:#202020}
+.fluent-manager .heading-count{font-size:13px;background:#e9e5e9;color:#666;padding:3px 9px;border-radius:5px}
 .fluent-manager .heading-row p{font-size:13px;color:#696969;margin-top:10px;line-height:1.8}
 .fluent-manager .capture-button{font-size:12px;color:#333;background:white;box-shadow:0 1px 2px #00000017;border-radius:5px;height:34px;padding:0 12px}
+.fluent-manager .toolbar{margin-top:23px;padding-bottom:18px;gap:9px}
+.manager-toolbar-label{flex:1;font-size:14px;color:#333;font-weight:600}
+.manager-toolbar-label>span{font-size:12px;color:#666;font-weight:400;margin-left:5px}
 .fluent-manager .layout-switch{background:#fff;border-radius:5px;box-shadow:0 1px 2px #00000010}
 .fluent-manager .layout-switch button{color:#666;width:31px;height:31px}
 .fluent-manager .layout-switch button.active{color:#0067c0;background:#e7f0fa;box-shadow:none;border-radius:4px}
@@ -117,74 +117,6 @@
 .fluent-manager .field-label,.fluent-manager .checkbox-label{font-size:13px;color:#444}
 .fluent-manager .modal input:not([type=checkbox]){background:white;color:#333;box-shadow:0 1px 2px #00000020;font-size:14px}
 .fluent-manager .modal input:focus{box-shadow:0 1px 0 1px #0067c0}
-
-.ai-mode-control{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;background:#eaf0fb;border-radius:8px}
-.ai-mode-control button{min-height:34px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;color:#435273;font-size:13px;font-weight:550;white-space:nowrap}
-.ai-mode-control button:hover:not(:disabled){background:#f7faff}
-.ai-mode-control button[aria-pressed=true]{background:#fff;color:#234fae;box-shadow:0 1px 3px #213a6724;font-weight:650}
-.ai-mode-control button:focus-visible{outline:2px solid #2d5cca;outline-offset:-2px}
-.clipboard-ai-status{display:flex;align-items:center;gap:7px;line-height:1.5;color:#3f5375;font-size:12px}
-.clipboard-ai-status svg{flex-shrink:0}
-.clipboard-ai-status.ready{color:#21664f}
-.clipboard-ai-status.error{color:#a12c36;overflow-wrap:anywhere}
-.fluent-manager .clipboard-ai-status{margin:0 28px 8px;padding:10px 12px;background:#fff;border-radius:7px;flex-shrink:0}
-.ai-result-label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;color:#244fae;background:#e8efff;border-radius:4px;padding:2px 6px;font-weight:600}
-.fluent-record-bottom .ai-result-label{color:#244fae}
-
-.compact-stage.desktop,.desktop .fluent-board{background:#f0f3f8}
-.fluent-caption{height:44px;padding-inline:16px 10px;color:#35415a}
-.compact-brand{display:flex;align-items:center;gap:8px;font-weight:650}
-.compact-brand img{width:22px;height:22px}
-.compact-ai{margin:1px 14px 5px;padding:10px;border:1px solid #dbe5f8;border-radius:10px;background:#f8faff;flex-shrink:0}
-.compact-ai-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 1px 7px;color:#284268;font-size:12px;font-weight:650}
-.compact-ai-heading>span:first-child{display:flex;align-items:center;gap:6px}
-.compact-ai-heading button{color:#2455bc;font-size:12px}
-.compact-ai-heading button:hover{text-decoration:underline}
-.compact-ai-paused{color:#8b5b1b;font-weight:500}
-.compact-ai .ai-mode-control button{min-height:30px}
-.compact-ai .clipboard-ai-status{margin:7px 2px 0}
-.fluent-tabs{gap:5px;padding:6px 14px 8px;position:relative;z-index:1}
-.fluent-tabs>button:not(.fluent-target){width:auto;height:33px;display:flex;align-items:center;justify-content:center;gap:4px;padding:0 6px;font-size:12px;white-space:nowrap;color:#526179}
-.fluent-tabs>button.active{color:#234fae;background:#e3eaf9;font-weight:650}
-.fluent-tabs>button.active:after{content:none}
-.fluent-tabs .fluent-target{position:relative;padding:0;white-space:nowrap}
-.fluent-target>button{display:flex;align-items:center;gap:3px;padding:6px;color:#435273;border-radius:5px}
-.fluent-target>button:hover,.fluent-target>button[aria-expanded=true]{background:#e3eaf9;color:#234fae}
-.compact-language-menu{position:absolute;right:0;top:calc(100% + 4px);min-width:102px;padding:4px;background:#fff;border:1px solid #e1e7f0;border-radius:7px;box-shadow:0 5px 20px #182f6126}
-.compact-language-menu button{display:block;width:100%;text-align:left;padding:7px 10px;border-radius:4px;font-size:12px}
-.compact-language-menu button:hover,.compact-language-menu button[aria-pressed=true]{background:#eef3ff;color:#234fae}
-.fluent-section-title{padding:3px 16px 9px}
-.fluent-section-title h1{color:#202633}
-.fluent-record{border:1px solid #e5ebf4;border-radius:9px;margin-bottom:9px;box-shadow:0 2px 5px #1d36500d}
-.fluent-record.selected{box-shadow:0 0 0 1px #8ba8e1,0 2px 5px #1d365013}
-.fluent-record.ai-result{background:#f7faff;border-color:#cfdefc}
-.fluent-record-body:hover{background:#eef3ff80}
-.fluent-board .compact-footer{background:#f7f9fe;color:#566783}
-.fluent-board .compact-footer button{color:#566783}
-
-.ai-settings{display:grid;gap:14px;max-width:860px}
-.ai-settings-card{min-width:0;padding:16px 18px;background:#fff;border:1px solid #dfe6f1;border-radius:11px;box-shadow:0 2px 5px #1a376408}
-.ai-settings-heading{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.ai-settings-heading h2{font-size:15px;font-weight:650;color:#24324c}
-.ai-settings-heading p{font-size:12px;color:#606c80;line-height:1.6;margin:3px 0 0}
-.ai-settings-icon{display:grid;place-items:center;width:35px;height:35px;flex-shrink:0;background:#edf2ff;color:#2455bc;border-radius:8px}
-.ai-settings-card .ai-mode-control{max-width:370px}
-.fluent-settings .ai-settings-card .field-label{font-size:13px;color:#34415b;margin:9px 0 5px}
-.fluent-settings .ai-settings-card .field-help{margin:7px 0 0;color:#586984;line-height:1.6}
-.fluent-settings .ai-settings-card input,.fluent-settings .ai-settings-card select{border:1px solid #dce4f2;box-shadow:none;color:#24324c}
-.fluent-settings .ai-settings-card .field-label-row{margin-top:0}
-.ai-language-fields{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:14px}
-.ai-key-note{display:flex;align-items:center;gap:5px;margin-top:9px;font-size:12px;color:#4e6484}
-.fluent-settings-footer{gap:10px;background:#f8faff}
-.fluent-settings-footer .form-error{margin:0 auto 0 0;min-width:0;overflow-wrap:anywhere}
-.fluent-settings-footer .button{flex-shrink:0}
-
-@media(max-width:700px){
-  .ai-language-fields{grid-template-columns:1fr;gap:5px}
-  .ai-settings-card{padding:12px}
-}
-@media(max-width:570px){.fluent-manager .main-heading{padding-bottom:12px}.manager-view-actions{margin-left:0}}
-@media(max-width:370px){.fluent-tabs>button:not(.fluent-target)>span{display:none}}
 @media(min-width:1650px){.fluent-manager .entries.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:1100px){.fluent-manager{--detail:292px}.fluent-manager .main-heading{padding-inline:20px}.fluent-manager .records-scroll{padding-inline:20px}.fluent-manager .detail-panel{margin-right:18px}.fluent-manager .browser-banner{margin-inline:20px}.fluent-manager .heading-row p{max-width:250px;font-size:12px}}
 @media(max-width:900px){.fluent-manager .detail-panel{display:none}.fluent-manager .detail-panel.mobile-open{display:flex;position:fixed;top:56px;right:0;bottom:0;margin:0;width:min(350px,calc(100vw - 20px));border-radius:9px 0 0 0;background:#faf8fa;box-shadow:-8px 0 40px #00000020}.fluent-manager .heading-row p{max-width:none}}

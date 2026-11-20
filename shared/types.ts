@@ -8,7 +8,6 @@ export const CLIPBOARD_AI_MODES = ['off', 'answer', 'translate'] as const;
 export type ClipboardAiMode = (typeof CLIPBOARD_AI_MODES)[number];
 export type AiResult = Exclude<ClipboardAiMode, 'off'>;
 export const AI_MODE_LABELS: Record<ClipboardAiMode, string> = { off: '关闭', answer: '作答', translate: '翻译' };
-export const AI_RESULT_LABELS: Record<AiResult, string> = { answer: 'AI 答案', translate: 'AI 译文' };
 export const AI_PROVIDERS = {
   openai: { name: 'OpenAI', apiEndpoint: 'https://api.openai.com/v1', apiModel: 'gpt-4o-mini' },
   deepseek: { name: 'DeepSeek', apiEndpoint: 'https://api.deepseek.com/v1', apiModel: 'deepseek-chat' },

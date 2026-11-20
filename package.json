@@ -1,7 +1,7 @@
 {
   "name": "pasteboard-plus",
   "productName": "PasteBoard Plus",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Clipboard history with automatic AI answers and translations.",
   "author": "PasteBoard Plus",
   "license": "MIT",
@@ -69,7 +69,7 @@
         "nsis",
         "zip"
       ],
-      "icon": "build/icon.ico",
+      "icon": "assets/icon.png",
       "signExecutable": false,
       "artifactName": "PasteBoard-Plus-${version}-win-${arch}.${ext}"
     },
@@ -82,6 +82,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
+      "installerIcon": "build/icon.ico",
       "installerHeader": "build/installerHeader.bmp",
       "installerSidebar": "build/installerSidebar.bmp",
       "shortcutName": "PasteBoard Plus",

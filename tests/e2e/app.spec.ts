@@ -129,9 +129,10 @@ test('Win11 popup translates with the supplied dictionary without an API and cop
   await page.getByTestId('compact-board').screenshot({ path: 'test-results/win11-popup.png' });
   await page.getByRole('button', { name: '打开设置', exact: true }).click();
   await expect(page.locator('.fluent-settings-nav')).toBeVisible();
-  await page.getByRole('button', { name: 'AI 与翻译', exact: true }).click();
+  await page.getByRole('button', { name: '翻译与词库', exact: true }).click();
   await expect(page.getByLabel('手动翻译方式')).toHaveValue('auto');
-  await expect(page.getByText('内置 TypeLingo 中英日词库，离线精确查词。')).toBeVisible();
+  await expect(page.getByText('32,159 条六向查询记录 · 离线可用')).toBeVisible();
+  await expect(page.getByLabel('自动处理模式')).toBeDisabled();
   await page.screenshot({ path: 'test-results/win11-settings.png', fullPage: true });
 });
 
@@ -157,7 +158,7 @@ test('Win11 manager and settings keep the same aligned search field', async ({ p
   expect(Math.abs(settingsBounds!.y + settingsBounds!.height / 2 - container!.y - container!.height / 2)).toBeLessThan(1);
   expect(Math.abs(icon!.y + icon!.height / 2 - container!.y - container!.height / 2)).toBeLessThan(1);
   await settingsSearch.fill('API');
-  await expect(page.getByRole('heading', { name: 'AI 与翻译', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '翻译与词库', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '清空设置搜索' }).click();
   await page.screenshot({ path: 'test-results/win11-settings-aligned.png' });
 });

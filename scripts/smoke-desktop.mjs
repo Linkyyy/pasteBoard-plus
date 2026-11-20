@@ -47,10 +47,12 @@ async function launch() {
   const page = await instance.firstWindow();
   await page.waitForFunction(() => window.pasteboard?.isDesktop === true);
   await page.getByRole('heading', { name: '剪贴板', exact: true }).waitFor();
+  assert.equal(await page.getByTestId('compact-board').evaluate(board => getComputedStyle(board).backgroundColor), 'rgb(242, 243, 245)');
   const bounds = await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
   assert.equal(bounds.width, 400); assert.equal(bounds.height, 580);
   await page.getByRole('button', { name: '管理记录', exact: true }).click();
   await page.getByRole('heading', { name: '所有记录' }).waitFor();
+  assert.equal(await page.locator('.fluent-manager').evaluate(window => getComputedStyle(window).backgroundColor), 'rgb(244, 241, 243)');
   const manager = await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
   assert(manager.width >= 1060 && manager.height >= 720);
   return instance;
@@ -65,6 +67,19 @@ async function until(predicate, message) {
   throw new Error(`Timed out: ${message}`);
 }
 async function writeText(text) { await desktop.evaluate(async ({ clipboard }, value) => { await clipboard.writeText(value); }, text); }
+async function openAiSettings(page) {
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '偏好设置' });
+  await dialog.getByRole('button', { name: '翻译与词库', exact: true }).click();
+  return dialog;
+}
+async function configureAiMode(page, mode, language) {
+  const dialog = await openAiSettings(page);
+  await dialog.getByLabel('自动处理模式').selectOption(mode);
+  if (language) await dialog.getByLabel('默认目标语言').selectOption(language);
+  await dialog.getByRole('button', { name: '保存设置', exact: true }).click();
+  await page.getByTestId('compact-board').waitFor();
+}
 try {
   desktop = await launch();
   let page = await desktop.firstWindow();
@@ -218,14 +233,19 @@ try {
   await page.screenshot({ path: 'test-results/desktop.png' });
 
   await page.evaluate(() => window.pasteboard.setWindowMode('compact'));
-  const modes = page.getByRole('group', { name: '剪贴板 AI 模式' });
+  assert.equal(await page.getByLabel('自动处理模式').count(), 0);
+  assert.equal(await page.getByRole('group', { name: '剪贴板 AI 模式' }).count(), 0);
   await writeText('Clipboard contents before enabling AI.');
-  await modes.getByRole('button', { name: '作答', exact: true }).click();
+  await configureAiMode(page, 'answer');
   await until(s => s.settings.clipboardAiMode === 'answer', 'enable answer mode');
   const question = 'What is 3 + 4?';
   const releaseAnswer = holdReply(question);
   await writeText(question);
-  await page.getByText('正在处理新复制的文字…').waitFor();
+  await until(s => s.clipboardAi?.state === 'working', 'answer in progress');
+  assert.equal(await page.getByText('正在处理新复制的文字…', { exact: true }).count(), 0);
+  const workingSettings = await openAiSettings(page);
+  await workingSettings.getByText('正在处理新复制的文字…', { exact: true }).waitFor();
+  await workingSettings.getByRole('button', { name: '关闭弹窗', exact: true }).click();
   assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), question);
   releaseAnswer();
   const answered = await until(s => s.clipboardAi?.state === 'ready', 'automatic answer');
@@ -234,12 +254,14 @@ try {
   assert.equal(answer.aiResult, 'answer');
   assert(answered.entries.some(entry => entry.content === question && !entry.aiResult), 'The original question stays in history');
   assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), answer.content);
-  await page.getByTestId('compact-record').first().getByText('AI 答案').waitFor();
-  await page.getByText('结果已复制，可以直接粘贴').waitFor();
+  await page.getByTestId('compact-record').first().getByText(answer.content, { exact: true }).waitFor();
+  assert.equal(await page.getByText('AI 答案', { exact: true }).count(), 0);
+  assert.equal(await page.getByText('结果已复制，可以直接粘贴', { exact: true }).count(), 0);
   assert.deepEqual(requests.slice(1).map(({ body }) => body.messages[1].content), [question]);
   assert.match(requests[1].body.messages[0].content, /Answer the user's question/);
   await page.screenshot({ path: 'test-results/desktop-ai-answer.png' });
   await page.evaluate(() => window.pasteboard.setWindowMode('manager'));
+  assert.equal(await page.getByRole('button', { name: 'AI 与翻译设置' }).count(), 0);
   const pasteTarget = page.getByRole('textbox', { name: '搜索历史记录' });
   await pasteTarget.press(process.platform === 'darwin' ? 'Meta+V' : 'Control+V');
   assert.equal(await pasteTarget.inputValue(), answer.content);
@@ -273,11 +295,8 @@ try {
   assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), sensitive);
   assert.equal((await state()).entries[0].content, replies.get(pendingQuestion));
 
-  await page.getByRole('button', { name: '切换翻译目标语言' }).click();
-  await page.getByRole('group', { name: '翻译目标语言' }).getByRole('button', { name: '日语', exact: true }).click();
-  await until(s => s.settings.targetLanguage === 'ja', 'choose Japanese');
-  await modes.getByRole('button', { name: '翻译', exact: true }).click();
-  await until(s => s.settings.clipboardAiMode === 'translate', 'enable translation mode');
+  await configureAiMode(page, 'translate', 'ja');
+  await until(s => s.settings.clipboardAiMode === 'translate' && s.settings.targetLanguage === 'ja', 'enable Japanese translation');
   const phrase = 'Good morning. See you tomorrow!';
   await writeText(phrase);
   const translated = await until(s => s.clipboardAi?.state === 'ready' && s.entries[0]?.aiResult === 'translate', 'automatic translation');
@@ -288,19 +307,24 @@ try {
   assert.equal(requests.some(({ body }) => body.messages[1].content === sensitive), false);
   assert.deepEqual(requests.slice(1).map(({ body }) => body.messages[1].content), [question, oldQuestion, newQuestion, pendingQuestion, phrase]);
   await page.getByRole('button', { name: '译文', exact: true }).click();
-  await page.getByTestId('compact-record').first().getByText('AI 译文').waitFor();
+  await page.getByTestId('compact-record').first().getByText(translated.entries[0].content, { exact: true }).waitFor();
+  assert.equal(await page.getByText('AI 译文', { exact: true }).count(), 0);
 
   const quotaQuestion = 'A request with no quota.';
   await writeText(quotaQuestion);
-  await page.getByRole('alert').getByText('请求过于频繁或额度不足，请稍后重试。').waitFor();
+  await until(s => s.clipboardAi?.state === 'error', 'automatic translation quota error');
+  assert.equal(await page.getByText('请求过于频繁或额度不足，请稍后重试。', { exact: true }).count(), 0);
   assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), quotaQuestion);
   assert.equal((await state()).entries[0].content, quotaQuestion);
-  await modes.getByRole('button', { name: '关闭', exact: true }).click();
+  const errorSettings = await openAiSettings(page);
+  await errorSettings.getByRole('alert').getByText('请求过于频繁或额度不足，请稍后重试。').waitFor();
+  await errorSettings.getByLabel('自动处理模式').selectOption('off');
+  await errorSettings.getByRole('button', { name: '保存设置', exact: true }).click();
   await until(s => s.settings.clipboardAiMode === 'off', 'turn AI off');
   await writeText('Clipboard contents after disabling AI.');
   await until(s => s.entries[0]?.content === 'Clipboard contents after disabling AI.', 'normal capture after disabling AI');
   assert.equal(requests.length, 7);
-  console.log('PASS AI mode controls, answers and translations in separate history entries and system clipboard, latest copy wins, sensitive copies and failures are preserved');
+  console.log('PASS AI mode and status live in settings, answers and translations use the restored history UI and system clipboard, latest copy wins');
 
   await page.evaluate(async () => {
     const { settings } = await window.pasteboard.getSnapshot();
