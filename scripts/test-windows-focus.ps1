@@ -23,8 +23,18 @@ try {
     $start.UseShellExecute = $false
     $start.EnvironmentVariables['PASTEBOARD_USER_DATA'] = $testProfile
     $desktop = [System.Diagnostics.Process]::Start($start)
-    [void]$desktop.WaitForInputIdle(15000)
-    Start-Sleep -Seconds 4
+    # The compact window is shown after the app registers shortcuts and captures its first focus target.
+    $appWindow = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $desktop.Id)
+    $readyDeadline = [DateTime]::UtcNow.AddSeconds(45)
+    do {
+      $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, $appWindow)
+      $visible = @($windows | Where-Object { -not $_.Current.IsOffscreen }).Count -gt 0
+      if ($visible) { break }
+      if ($desktop.HasExited) { throw 'The packaged application exited during startup.' }
+      Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $readyDeadline)
+    if (-not $visible) { throw 'The initial clipboard window did not open.' }
+    Write-Output 'Packaged clipboard window is visible.'
   }
   $form.Show(); $form.Activate(); $field.Focus() | Out-Null
   [System.Windows.Forms.Application]::DoEvents()
@@ -61,10 +71,13 @@ try {
     $data.SetText($clipboardText, [System.Windows.Forms.TextDataFormat]::UnicodeText)
     $data.SetData('PasteBoardTypingTest', 'unchanged')
     [System.Windows.Forms.Clipboard]::SetDataObject($data, $true)
+    $form.Activate(); $field.Focus() | Out-Null; [System.Windows.Forms.Application]::DoEvents()
+    $atShortcut = [PasteBoardNative.FocusBridge]::Capture('0')
+    if ($atShortcut.process -ne $PID -or $atShortcut.control -ne $context.control) { throw 'The test field lost keyboard focus before the shortcut.' }
     [System.Windows.Forms.SendKeys]::SendWait('^%v')
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
     while ([DateTime]::UtcNow -lt $deadline -and ($field.Text -replace "`r`n?", "`n") -ne $expected) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 }
-    if (($field.Text -replace "`r`n?", "`n") -ne $expected) { throw 'The packaged global shortcut did not type the clipboard text.' }
+    if (($field.Text -replace "`r`n?", "`n") -ne $expected) { throw "Packaged typing yielded $($field.Text.Length) UTF-16 units. Expected $($clipboardText.Length). Field focused: $($field.Focused). App exited: $($desktop.HasExited)." }
     if (-not [System.Windows.Forms.Clipboard]::ContainsData('PasteBoardTypingTest')) { throw 'The global shortcut rewrote the clipboard.' }
     Write-Output 'PASS packaged Ctrl+Alt+V, paste-disabled field, multiple lines, and clipboard formats.'
   }
