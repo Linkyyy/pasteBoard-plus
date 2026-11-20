@@ -1,9 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
-import { translateText, type TranslationFetch } from '../electron/translate';
+import { answerText, translateText, type TranslationFetch } from '../electron/translate';
 import { endpointSchema, settingsSchema } from '../electron/schema';
 import { DEFAULT_SETTINGS } from '../shared/types';
 
 function response(status: number, body: unknown) { return { ok: status >= 200 && status < 300, status, text: async () => typeof body === 'string' ? body : JSON.stringify(body) }; }
+describe('AI answers', () => {
+  it('asks for a concise, complete plain-text answer and removes returned Markdown formatting', async () => {
+    const content = '# 结论\n\n**支持。**\n\n1. 第一题用 `a * b`。\n3. 第三题看[示例](https://example.org)。';
+    const request = vi.fn<TranslationFetch>().mockResolvedValue(response(200, { choices: [{ message: { content } }] }));
+    await expect(answerText('回答第一题和第三题。', DEFAULT_SETTINGS, 'test-key', undefined, request))
+      .resolves.toBe('结论\n\n支持。\n\n1、第一题用 a * b。\n3、第三题看示例 (https://example.org)。');
+    const { messages } = JSON.parse(request.mock.calls[0][1].body);
+    expect(messages[0].content).toMatch(/cover every part of the question.*plain text.*Do not use Markdown/s);
+    expect(messages[1]).toEqual({ role: 'user', content: '回答第一题和第三题。' });
+  });
+
+  it('preserves plain text, link destinations, table values and literal fenced code', async () => {
+    const plain = '已知 x * y = 6。计算 2*3*4 = 24。参见 https://example.org/?a=1&b=2。';
+    const content = `${plain}\n\n| x | y |\n| --- | --- |\n| 2 | 3 |\n\n\`\`\`py\n# 乘法\nprint(2 * 3)\n\`\`\``;
+    const request: TranslationFetch = async () => response(200, { choices: [{ message: { content } }] });
+    await expect(answerText('如何计算？', DEFAULT_SETTINGS, 'test-key', undefined, request))
+      .resolves.toBe(`${plain}\n\nx\ty\n2\t3\n\n# 乘法\nprint(2 * 3)`);
+  });
+});
+
 describe('AI translation', () => {
   it('sends only the selected text, model and target language to the configured provider', async () => {
     const request = vi.fn<TranslationFetch>().mockResolvedValue(response(200, { choices: [{ message: { content: '你好，世界。' }, finish_reason: 'stop' }] }));
@@ -25,6 +45,12 @@ describe('AI translation', () => {
     for (const body of ['<html>broken</html>', { choices: [] }, { choices: [{ message: { content: 'partial' }, finish_reason: 'length' }] }]) {
       await expect(translateText('hello', 'en', DEFAULT_SETTINGS, 'test-key', async () => response(200, body))).rejects.toThrow(/无法识别|有效译文|截断/);
     }
+  });
+  it('preserves formatting in translations', async () => {
+    const content = '**注意**\n\n- 翻译内容';
+    const request: TranslationFetch = async () => response(200, { choices: [{ message: { content } }] });
+    await expect(translateText('**Note**\n\n- Content', 'zh-CN', DEFAULT_SETTINGS, 'test-key', request))
+      .resolves.toMatchObject({ text: content });
   });
   it('does not call the provider without a key or for overlong content', async () => {
     const request = vi.fn<TranslationFetch>();

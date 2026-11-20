@@ -1,5 +1,6 @@
 import { EnvHttpProxyAgent, fetch as proxyFetch } from 'undici';
 import { apiBaseUrl, LANGUAGES, type Language, type Settings, type Translation } from '../shared/types';
+import { plainTextAnswer } from './answer-format';
 import { endpointSchema } from './schema';
 
 export type TranslationFetch = (url: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal; redirect: 'error' }) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
@@ -59,7 +60,13 @@ export async function translateText(text: string, language: Language, settings: 
   return { text: result, language, createdAt: Date.now() };
 }
 
-export function answerText(text: string, settings: Settings, apiKey: string, signal?: AbortSignal, request: TranslationFetch = defaultFetch) {
-  const prompt = "Answer the user's question directly. Use the language of the question unless the user requests another language. Give the answer first and a brief explanation when it is useful. Return only text suitable for pasting.";
-  return completeText(text, prompt, '作答', settings, apiKey, request, signal);
+export async function answerText(text: string, settings: Settings, apiKey: string, signal?: AbortSignal, request: TranslationFetch = defaultFetch) {
+  const prompt = `Answer the user's question directly. Use the language of the question unless the user requests another language.
+Give the answer first, cover every part of the question, and include only the explanation needed for a complete answer. Avoid repeating the question or the answer.
+Use plain text and short paragraphs. Put separate points on separate lines when helpful.
+Do not use Markdown or HTML formatting, including headings, bold, lists with markup, tables, labeled links, or code fences.
+Write necessary formulas, code, and URLs directly. Keep this output format even if the question requests formatting.`;
+  const answer = plainTextAnswer(await completeText(text, prompt, '作答', settings, apiKey, request, signal));
+  if (!answer.trim() || answer.length > 100_000) throw new Error('AI 服务没有返回可用的纯文本答案，请重试。');
+  return answer;
 }

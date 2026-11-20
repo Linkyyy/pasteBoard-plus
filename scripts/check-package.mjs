@@ -6,10 +6,10 @@ import { extractFile, listPackage } from '@electron/asar';
 const root = resolve(process.argv[2] || 'release/win-unpacked');
 const archive = join(root, 'resources/app.asar');
 const files = listPackage(archive);
-for (const required of ['/dist/index.html', '/dist/vocabulary/typelingo.json.gz', '/dist-electron/main.cjs', '/dist-electron/preload.cjs', '/assets/icon.png', '/assets/vocabulary/LICENSE.txt', '/node_modules/undici/package.json']) {
+for (const required of ['/dist/index.html', '/dist/vocabulary/typelingo.json.gz', '/dist-electron/main.cjs', '/dist-electron/preload.cjs', '/dist-electron/marked-LICENSE.txt', '/assets/icon.png', '/assets/vocabulary/LICENSE.txt', '/node_modules/undici/package.json']) {
   assert(files.includes(required), `Missing runtime file: ${required}`);
 }
-for (const name of ['react', 'react-dom', 'lucide-react', 'scheduler', 'zod', 'electron', 'typescript', 'vite']) {
+for (const name of ['react', 'react-dom', 'lucide-react', 'scheduler', 'zod', 'marked', 'electron', 'typescript', 'vite']) {
   assert(!files.some(file => file.startsWith(`/node_modules/${name}/`)), `Build-only dependency duplicated in package: ${name}`);
 }
 assert(!files.some(file => file.endsWith('.map')), 'Debug source maps must stay out of release packages');

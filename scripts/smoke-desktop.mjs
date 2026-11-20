@@ -9,7 +9,7 @@ if (!process.env.DISPLAY && process.platform === 'linux') throw new Error('Set D
 const data = await mkdtemp(join(tmpdir(), 'pasteboard-desktop-'));
 const requests = [];
 const replies = new Map([
-  ['What is 3 + 4?', '3 + 4 = 7.'],
+  ['What is 3 + 4?', '**3 + 4 = 7.**'],
   ['What is the old answer?', 'This response was superseded.'],
   ['What is the current answer?', 'This response is current.'],
   ['Good morning. See you tomorrow!', 'おはようございます。また明日！'],
@@ -250,7 +250,7 @@ try {
   releaseAnswer();
   const answered = await until(s => s.clipboardAi?.state === 'ready', 'automatic answer');
   const answer = answered.entries[0];
-  assert.equal(answer.content, replies.get(question));
+  assert.equal(answer.content, '3 + 4 = 7.');
   assert.equal(answer.aiResult, 'answer');
   assert(answered.entries.some(entry => entry.content === question && !entry.aiResult), 'The original question stays in history');
   assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), answer.content);

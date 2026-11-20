@@ -35,6 +35,7 @@ export default function AiSettings({ input, snapshot, onChange }: {
           onChange={event => onChange({ ...input, clipboardAiMode: event.target.value as ClipboardAiMode })}>
           {CLIPBOARD_AI_MODES.map(mode => <option key={mode} value={mode}>{AI_MODE_LABELS[mode]}</option>)}
         </select>
+        {input.clipboardAiMode === 'answer' && <p className="field-help">答案使用纯文本，简明覆盖问题要点。</p>}
       </div>
       <div>
         <label className="field-label" htmlFor="target-language">默认目标语言</label>

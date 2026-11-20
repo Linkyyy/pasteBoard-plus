@@ -1,4 +1,6 @@
+import { copyFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 
 await build({ entryPoints: ['electron/main.ts'], outfile: 'dist-electron/main.cjs', bundle: true, platform: 'node', target: 'node24', format: 'cjs', external: ['electron', 'undici'], minify: true });
 await build({ entryPoints: ['electron/preload.ts'], outfile: 'dist-electron/preload.cjs', bundle: true, platform: 'node', target: 'node24', format: 'cjs', external: ['electron'] });
+await copyFile(new URL('../node_modules/marked/LICENSE', import.meta.url), 'dist-electron/marked-LICENSE.txt');

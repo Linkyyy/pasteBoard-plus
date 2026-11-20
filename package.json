@@ -1,7 +1,7 @@
 {
   "name": "pasteboard-plus",
   "productName": "PasteBoard Plus",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Clipboard history with automatic AI answers and translations.",
   "author": "PasteBoard Plus",
   "license": "MIT",
@@ -36,6 +36,7 @@
     "electron-builder": "26.18.0",
     "esbuild": "0.28.2",
     "lucide-react": "1.68.0",
+    "marked": "18.2.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "5.9.3",
