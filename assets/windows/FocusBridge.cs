@@ -101,17 +101,30 @@ namespace PasteBoardNative {
       string problem = ValidateTarget(target, control, process, elementKey);
       if (problem != null) return Failure(problem);
       // Wait for the user's shortcut modifiers to be released; never release their keys for them.
-      for (int i = 0; i < 50; i++) {
-        if (!Pressed(0x10) && !Pressed(0x11) && !Pressed(0x12) && !Pressed(0x5B) && !Pressed(0x5C)) break;
-        Thread.Sleep(10);
-      }
-      if (Pressed(0x10) || Pressed(0x11) || Pressed(0x12) || Pressed(0x5B) || Pressed(0x5C)) return Failure("请松开快捷键后再点击词条。");
+      if (!WaitForRelease(0, 50)) return Failure("请松开快捷键后再点击词条。");
       problem = ValidateTarget(target, control, process, elementKey);
       if (problem != null) return Failure(problem);
       var keys = new INPUT[] { Key(0x11, false), Key(0x56, false), Key(0x56, true), Key(0x11, true) };
       uint sent = SendInput((uint)keys.Length, keys, Marshal.SizeOf(typeof(INPUT)));
       if (sent != keys.Length) return Failure("目标程序拒绝自动粘贴（可能以管理员权限运行）。内容已复制，可手动粘贴。");
       return new PasteResult { pasted = true, message = "已发送粘贴到原输入框" };
+    }
+
+    // Send committed UTF-16 characters through the Windows keyboard input queue.
+    public static string TypeText(string window, string control, uint process, string elementKey, string text, int releaseKey) {
+      long handle;
+      if (!long.TryParse(window, out handle) || handle == 0) return "请先点击目标输入框，再按逐字输入快捷键。";
+      if (releaseKey != 0 && !WaitForRelease(releaseKey, 100)) return "请松开快捷键后重试。";
+      var keys = new INPUT[text.Length * 2];
+      for (int i = 0; i < text.Length; i++) {
+        keys[2 * i] = UnicodeKey(text[i], false);
+        keys[2 * i + 1] = UnicodeKey(text[i], true);
+      }
+      if (ValidateTarget(new IntPtr(handle), control, process, elementKey) != null) return "输入焦点已改变或无法确认，已停止逐字输入。";
+      if (ShortcutHeld(0) || Pressed(0x1B)) return "按键状态已改变，已停止逐字输入。";
+      uint sent = SendInput((uint)keys.Length, keys, Marshal.SizeOf(typeof(INPUT)));
+      if (sent != keys.Length) return "目标程序未接受全部字符，已停止输入。请检查已输入的文字。";
+      return null;
     }
     static string ValidateTarget(IntPtr target, string control, uint process, string elementKey) {
       if (!IsWindow(target) || GetForegroundWindow() != target) return ("焦点已切换。内容已复制，请在目标输入框重新唤出后粘贴。");
@@ -131,6 +144,18 @@ namespace PasteBoardNative {
       return null;
     }
     static bool Pressed(int key) { return (GetAsyncKeyState(key) & 0x8000) != 0; }
+    static bool ShortcutHeld(int key) {
+      return Pressed(0x10) || Pressed(0x11) || Pressed(0x12) || Pressed(0x5B) || Pressed(0x5C) || (key != 0 && Pressed(key));
+    }
+    static bool WaitForRelease(int key, int attempts) {
+      for (int i = 0; i < attempts && ShortcutHeld(key); i++) Thread.Sleep(10);
+      return !ShortcutHeld(key);
+    }
+    static INPUT UnicodeKey(char unit, bool up) {
+      const uint KEYEVENTF_UNICODE = 0x0004, KEYEVENTF_KEYUP = 0x0002;
+      var keyboard = new KEYBDINPUT { scan = unit, flags = KEYEVENTF_UNICODE | (up ? KEYEVENTF_KEYUP : 0u) };
+      return new INPUT { type = 1, data = new INPUTUNION { keyboard = keyboard } };
+    }
     static INPUT Key(ushort key, bool up) { return new INPUT { type = 1, data = new INPUTUNION { keyboard = new KEYBDINPUT { vk = key, flags = up ? 2u : 0u } } }; }
     static PasteResult Failure(string message) { return new PasteResult { pasted = false, message = message }; }
   }

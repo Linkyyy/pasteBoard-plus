@@ -13,6 +13,10 @@ try {
       $request = $line | ConvertFrom-Json
       if ($request.command -eq 'capture') { $value = [PasteBoardNative.FocusBridge]::Capture([string]$request.ownWindow) }
       elseif ($request.command -eq 'paste') { $value = [PasteBoardNative.FocusBridge]::Paste([string]$request.window, [string]$request.control, [uint32]$request.process, [string]$request.elementKey) }
+      elseif ($request.command -eq 'typeText') {
+        $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String([string]$request.utf16))
+        $value = [PasteBoardNative.FocusBridge]::TypeText([string]$request.window, [string]$request.control, [uint32]$request.process, [string]$request.elementKey, $text, [int]$request.releaseKey)
+      }
       elseif ($request.command -eq 'quit') { break }
       else { throw 'Unknown command' }
       [Console]::WriteLine((@{ id = $request.id; ok = $true; value = $value } | ConvertTo-Json -Compress -Depth 5))

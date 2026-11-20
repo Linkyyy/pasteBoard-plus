@@ -32,12 +32,14 @@ describe('persistent history', () => {
     const file = join(directory, 'history.json'); const raw = JSON.parse(readFileSync(file, 'utf8'));
     delete raw.settings.captureImages; raw.settings.historyLimit = oldLimit;
     delete raw.settings.clipboardAiMode;
+    delete raw.settings.typingShortcut;
     writeFileSync(file, JSON.stringify(raw));
     const restored = new HistoryStore(directory);
     expect(restored.entries[0].content).toBe('previous version');
     expect(restored.settings.historyLimit).toBe(expected);
     expect(restored.settings.captureImages).toBe(false);
     expect(restored.settings.clipboardAiMode).toBe('off');
+    expect(restored.settings.typingShortcut).toBe('CommandOrControl+Alt+V');
   });
   it('retains the original API settings, credentials and images if a settings write fails', () => {
     const store = new HistoryStore(directory);

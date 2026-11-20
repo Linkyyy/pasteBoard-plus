@@ -2,13 +2,13 @@
 
 给每一次复制，一个好去处。一个类似 Windows + V 的桌面剪贴板，基于 Electron、React 和 TypeScript，主要面向 Windows，也可在 macOS / Linux 上开发运行。
 
-## 下载 v0.1.8
+## 下载 v0.1.9
 
-- Windows x64 安装版支持选择安装位置。[下载 EXE](installers/PasteBoard-Plus-Setup-0.1.8-x64.exe?raw=true)
-- 便携版完整解压后运行 `PasteBoard Plus.exe`。[下载 ZIP](installers/PasteBoard-Plus-0.1.8-win-x64.zip?raw=true)
+- Windows x64 安装版支持选择安装位置。[下载 EXE](installers/PasteBoard-Plus-Setup-0.1.9-x64.exe?raw=true)
+- 便携版完整解压后运行 `PasteBoard Plus.exe`。[下载 ZIP](installers/PasteBoard-Plus-0.1.9-win-x64.zip?raw=true)
 - 下载后可核对文件完整性。[SHA-256 校验文件](installers/SHA256SUMS.txt)
 
-v0.1.8 的作答模式会给出简明、覆盖要点的纯文本答案。AI 作答和自动翻译可在「设置 → 翻译与词库」开启，生成结果以普通记录加入历史。[项目官网](https://pasteboard-plus.vercel.app/)
+v0.1.9 新增 Windows 逐字输入快捷键。复制文字或等 AI 答案就绪后，在目标输入框按下并松开 `Ctrl + Alt + V` 即可直接输入。AI 作答和自动翻译可在「设置 → 翻译与词库」开启，生成结果以普通记录加入历史。[项目官网](https://pasteboard-plus.vercel.app/)
 
 安装包通过 Git LFS 存储。可通过上方链接直接获取，或在安装 Git LFS 后随仓库克隆。安装包未签名。Windows 实机安装、光标定位和原生自动粘贴待验证。
 
@@ -27,6 +27,8 @@ v0.1.8 的作答模式会给出简明、覆盖要点的纯文本答案。AI 作�
 - **后台运行**：关闭窗口后继续在托盘记录；快捷键再次打开，托盘菜单可暂停或退出。
 
 Windows：先点击目标输入框，按设置的快捷键调出小窗口，再用鼠标点击词条或「粘贴译文」。小窗口保持原输入焦点，输入内容不会被程序读取。原输入框改变、权限较高的程序拒绝模拟输入、辅助服务被系统策略禁用时，会提示原因并保留复制结果，可手动 `Ctrl + V`。没有强制切换前台窗口或请求管理员权限。
+
+在 Windows 上，普通粘贴使用 `Ctrl + V`。需要逐字输入时，点击目标输入框，按下并松开 `Ctrl + Alt + V`。软件通过 Windows Unicode 键盘事件输入当前剪贴板的文字，支持中文、表情和换行。发送过程中会检查目标焦点，检测到焦点改变时会停止后续输入。可在「设置 → 常规与历史」更改逐字输入快捷键，录制时按退格键可停用。目标应用需接受 Unicode 键盘输入，仅接受输入法组合事件的控件可能不兼容。
 
 Windows 小窗口保留输入焦点，因此方向键和打字仍作用于原输入框；`Escape` 收起小窗口。管理界面提供搜索和完整操作。macOS / Linux 暂时只复制并收起，请回到原应用手动粘贴。
 
@@ -61,7 +63,7 @@ npm run dist:win     # Windows x64 安装程序 + 便携 ZIP
 npm run pack         # 当前平台的未压缩应用目录
 ```
 
-Windows 安装程序输出到 `release/PasteBoard-Plus-Setup-0.1.8-x64.exe`，可选择安装位置并创建桌面快捷方式。便携包输出到 `release/PasteBoard-Plus-0.1.8-win-x64.zip`。解压整个 ZIP 后运行 `PasteBoard Plus.exe`。Windows 输入辅助服务使用系统自带的 Windows PowerShell / .NET Framework，无需安装开发 SDK。v0.1.4 修正了自绘输入控件未暴露 Edit / ValuePattern 时误报“未找到原输入框”的判断；仅无法获取精确光标不再阻止粘贴。粘贴前仍检查原窗口、进程及焦点身份，目标改变时拒绝发送。
+Windows 安装程序输出到 `release/PasteBoard-Plus-Setup-0.1.9-x64.exe`，可选择安装位置并创建桌面快捷方式。便携包输出到 `release/PasteBoard-Plus-0.1.9-win-x64.zip`。解压整个 ZIP 后运行 `PasteBoard Plus.exe`。Windows 输入辅助服务使用系统自带的 Windows PowerShell / .NET Framework，无需安装开发 SDK。v0.1.4 修正了自绘输入控件未暴露 Edit / ValuePattern 时误报“未找到原输入框”的判断；仅无法获取精确光标不再阻止粘贴。粘贴前仍检查原窗口、进程及焦点身份，目标改变时拒绝发送。
 
 浏览器预览明确标注其模式：只能在点击「捕获剪贴板」时读取浏览器获准访问的文字，历史保存在此浏览器中。示例须手动载入；不会把示例加入桌面历史。系统全局快捷键、自动监听和 AI 请求由桌面版提供。
 
@@ -119,7 +121,7 @@ powershell.exe -NoProfile -STA -File scripts/test-windows-focus.ps1
 
 桌面测试使用独立的临时数据目录和本机 HTTP 模拟服务，验证原生窗口在光标来源波动及鼠标移动时保持位置、手动拖动不回弹、重新唤出才定位，以及默认小窗口和管理 / 设置尺寸切换、文件跳过、图片默认关闭及手动启用、系统文字 / 图片读写、自动分类、敏感标记、暂停 / 恢复、全局快捷键注册、安装包内词库查词与复制、翻译 UI 到 API、重启恢复和图片清理。不会读取已有应用历史，也不会调用真实 AI 服务。
 
-Windows 专用脚本创建自己的测试输入框，检查光标获取、Unicode 粘贴、焦点保持以及拒绝已改变的目标；仅访问测试框文字，结束后恢复剪贴板。编译检查不能替代 Windows 实机测试，云端 Linux 测试未覆盖 Windows 原生输入行为。
+Windows 专用脚本创建自己的输入框，分别检查普通粘贴、禁用粘贴时的 Unicode 逐字输入和焦点改变后的中止行为，结束后恢复剪贴板。传入 `-ApplicationPath` 与便携版程序路径还会验证已打包应用的全局快捷键。编译检查不能替代 Windows 实机测试，云端 Linux 测试未覆盖 Windows 原生输入行为。
 
 云环境通过现有网络代理访问 npm、GitHub 官方 Electron 发布资源。Node.js 下载器需要使用代理时：
 
@@ -156,7 +158,7 @@ tests/           单元测试和浏览器端到端测试
 
 界面依赖在构建时合并，不再随运行时重复携带完整的 React、图标库及 Zod 源码；发行包不含调试 source map。Chromium 只保留中英文资源，AI 翻译仍支持原有全部目标语言。安装包仍包含离线运行所需的 Electron / Chromium，没有改成需要联网下载主体的安装器。
 
-下载目录仅保留当前版本，旧版本可从 `v0.1.1` 至 `v0.1.7` 的标签获取。
+下载目录仅保留当前版本，旧版本可从 `v0.1.1` 至 `v0.1.8` 的标签获取。
 
 与 v0.1.1 的实测体积对比（v0.1.5 离线完整包，含本地词库）：
 

@@ -55,6 +55,24 @@ test('settings records shortcut and clear keeps pinned entries by default', asyn
   await expect(page.getByTestId('entry-card')).toHaveCount(2);
 });
 
+test('the typing shortcut preserves ordinary paste and can be customized separately', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
+  const typing = page.getByRole('button', { name: '录制逐字输入快捷键' });
+  await expect(typing).toContainText('Alt');
+  await typing.click(); await typing.press('Control+v');
+  await page.getByRole('button', { name: '保存设置' }).click();
+  await expect(page.getByRole('alert')).toContainText('系统复制');
+  await typing.click(); await typing.press('Control+Alt+J');
+  await page.getByRole('button', { name: '保存设置' }).click();
+  await page.reload();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
+  await expect(typing).toContainText('J');
+  await expect(page.getByRole('button', { name: '录制全局快捷键' })).toContainText('Shift');
+  await typing.click(); await typing.press('Backspace');
+  await expect(typing).toContainText('已停用');
+});
+
 test('AI configuration explains provider privacy and never persists a preview key', async ({ page }) => {
   await page.goto('/'); await page.getByRole('button', { name: '管理记录', exact: true }).click(); await page.getByRole('button', { name: '体验示例' }).click();
   await page.getByRole('button', { name: '设置 AI 翻译' }).click();

@@ -7,6 +7,7 @@ import { idSchema, languageSchema, settingsSchema } from './schema';
 import { TranslationService } from './translation-service';
 import { answerText, translateText } from './translate';
 import { WindowsFocus, type FocusContext } from './windows-focus';
+import { ClipboardShortcuts } from './shortcuts';
 import { PopupSession } from './popup-session';
 import { popupPosition } from '../shared/popup-position';
 import { hasFocusTarget } from '../shared/focus-target';
@@ -20,12 +21,11 @@ let window: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let store: HistoryStore;
 let apiKey = '';
-let shortcutRegistered = false;
 let quitting = false;
 let lastFingerprint = '';
 let timer: ReturnType<typeof setInterval> | undefined;
 let focusTimer: ReturnType<typeof setInterval> | undefined;
-let pasting = false;
+let inserting = false;
 let captureWarning: string | null = null;
 let clipboardAi: Snapshot['clipboardAi'];
 let aiJob: { controller: AbortController; sourceId: string } | undefined;
@@ -38,6 +38,7 @@ let openingPending = false;
 let translations: TranslationService;
 const pendingTranslations = new Map<string, Promise<unknown>>();
 let clipboardQueue: Promise<unknown> = Promise.resolve();
+const shortcuts = new ClipboardShortcuts(globalShortcut, process.platform, () => store.settings, toggleWindow, () => void typeClipboardText());
 function withClipboard<T>(action: () => Promise<T>): Promise<T> {
   const pending = clipboardQueue.then(action);
   clipboardQueue = pending.catch(() => undefined);
@@ -52,7 +53,7 @@ function snapshot(): Snapshot {
   const focusTarget = popupSession?.target;
   return { windowMode, entries: store.entries, categories: store.categories, settings: store.settings,
     hasApiKey: Boolean(apiKey), keyStorage: canSecurelyStoreKey() ? 'secure' : 'session',
-    shortcutRegistered, warning: captureWarning || store.warning, clipboardAi,
+    ...shortcuts.status, warning: captureWarning || store.warning, clipboardAi,
     insertion: { supported: process.platform === 'win32' && !focusError, hasTarget: hasFocusTarget(focusTarget), caretLocated: Boolean(focusTarget?.caretLocated), message: focusError } };
 }
 function broadcast() {
@@ -124,6 +125,17 @@ async function openCompact() {
   openingPending = false; setWindowMode('compact', focusTarget, fallback); showWindow();
 }
 function toggleWindow() { if ((window?.isVisible() && windowMode === 'compact') || openingPending) { opening++; openingPending = false; window?.hide(); } else void openCompact(); }
+async function typeClipboardText() {
+  if (inserting || quitting || !focusService || !window || window.isFocused()) return;
+  inserting = true;
+  try {
+    const shortcut = store.settings.typingShortcut;
+    const [target, text] = await Promise.all([focusService.captureForTyping(ownWindowHandle()), clipboard.readText()]);
+    await focusService.typeText(target, text, shortcut);
+  } catch (error) {
+    if (!quitting) tray?.displayBalloon({ title: '逐字输入', content: error instanceof Error ? error.message : '无法输入剪贴板文字。', noSound: true });
+  } finally { inserting = false; }
+}
 function updateTray() {
   if (!tray) return;
   const { captureEnabled } = store.settings;
@@ -333,19 +345,20 @@ function registerHandlers() {
   }));
   handle('paste', (rawId, rawTranslated) => withClipboard(async () => {
     if (windowMode !== 'compact') throw new Error('请从剪贴板小窗口选择要粘贴的词条。');
-    await writeEntry(idSchema.parse(rawId), z.boolean().parse(rawTranslated));
-    if (process.platform === 'win32' && store.settings.autoPaste) {
-      const focusTarget = popupSession?.target;
-      if (!focusService || !focusTarget) throw new Error('内容已复制。请先在输入框中按快捷键唤出剪贴板。');
-      pasting = true;
-      try {
+    if (inserting) throw new Error('正在输入文字，请稍后再粘贴。');
+    inserting = true;
+    try {
+      await writeEntry(idSchema.parse(rawId), z.boolean().parse(rawTranslated));
+      if (process.platform === 'win32' && store.settings.autoPaste) {
+        const focusTarget = popupSession?.target;
+        if (!focusService || !focusTarget) throw new Error('内容已复制。请先在输入框中按快捷键唤出剪贴板。');
         const result = await focusService.paste(focusTarget);
         if (!result.pasted) throw new Error(result.message);
         window?.hide(); return result;
-      } finally { pasting = false; }
-    }
-    window?.hide();
-    return { pasted: false, message: process.platform === 'win32' ? '已复制到剪贴板' : '已复制；此平台请返回输入框手动粘贴' };
+      }
+      window?.hide();
+      return { pasted: false, message: process.platform === 'win32' ? '已复制到剪贴板' : '已复制；此平台请返回输入框手动粘贴' };
+    } finally { inserting = false; }
   }));
   handle('pin', rawId => { store.togglePin(idSchema.parse(rawId)); broadcast(); });
   handle('copy-translation', rawId => withClipboard(async () => {
@@ -369,7 +382,6 @@ function registerHandlers() {
   handle('image', rawId => `data:image/png;base64,${store.readImage(idSchema.parse(rawId)).toString('base64')}`);
   handle('settings', rawSettings => withClipboard(async () => {
     const { apiKey: newKey, clearApiKey, ...settings } = settingsSchema.parse(rawSettings);
-    if (settings.shortcut === 'Super+V') throw new Error('Windows + V 由系统剪贴板占用，请选择其他组合。');
     const previous = store.settings;
     const endpointChanged = apiBaseUrl(previous.apiEndpoint) !== apiBaseUrl(settings.apiEndpoint);
     const nextKey = newKey || (clearApiKey || endpointChanged ? '' : apiKey);
@@ -379,23 +391,10 @@ function registerHandlers() {
     }
     let encryptedKey: string | undefined;
     if (newKey && canSecurelyStoreKey()) encryptedKey = safeStorage.encryptString(newKey).toString('base64');
-    const changedShortcut = settings.shortcut !== previous.shortcut || !shortcutRegistered;
-    const previousRegistered = shortcutRegistered;
-    if (changedShortcut) {
-      let registered = false;
-      try { registered = globalShortcut.register(settings.shortcut, toggleWindow); } catch { /* invalid or unavailable */ }
-      if (!registered) throw new Error('这个快捷键已被占用或当前系统不支持，请更换组合。');
-      shortcutRegistered = true;
-    }
-    try { await applySettings(settings, nextKey, newKey || clearApiKey || endpointChanged ? { encryptedKey } : undefined); }
-    catch (error) {
-      if (changedShortcut) {
-        globalShortcut.unregister(settings.shortcut);
-        shortcutRegistered = previousRegistered;
-      }
-      throw error;
-    }
-    if (settings.shortcut !== previous.shortcut && previousRegistered) globalShortcut.unregister(previous.shortcut);
+    try {
+      shortcuts.prepare(settings, previous);
+      await applySettings(settings, nextKey, newKey || clearApiKey || endpointChanged ? { encryptedKey } : undefined);
+    } finally { shortcuts.releaseUnused(); }
   }));
   handle('translate', (rawId, rawLanguage) => {
     const id = idSchema.parse(rawId); const language = languageSchema.parse(rawLanguage); const entry = store.require(id);
@@ -457,7 +456,7 @@ else {
       void focusService.warm().catch(error => { focusError = error instanceof Error ? error.message : 'Windows 输入服务不可用。'; broadcast(); });
     }
     registerHandlers();
-    try { shortcutRegistered = globalShortcut.register(store.settings.shortcut, toggleWindow); } catch { shortcutRegistered = false; }
+    shortcuts.prepare(store.settings);
     const icon = nativeImage.createFromPath(join(app.getAppPath(), 'assets/icon.png')).resize({ width: 22, height: 22 });
     tray = new Tray(icon); tray.setToolTip('PasteBoard Plus · 你的灵感中转站'); tray.on('click', toggleWindow); updateTray();
     await createWindow();
@@ -473,11 +472,11 @@ else {
     let following = false;
     focusTimer = setInterval(async () => {
       const session = popupSession;
-      if (following || pasting || openingPending || windowMode !== 'compact' || !window?.isVisible() || !focusService || !session?.target || !hasFocusTarget(session.target)) return;
+      if (following || inserting || openingPending || windowMode !== 'compact' || !window?.isVisible() || !focusService || !session?.target || !hasFocusTarget(session.target)) return;
       following = true;
       try {
         const current = await focusService.capture(ownWindowHandle());
-        if (pasting || openingPending || windowMode !== 'compact' || !window?.isVisible() || popupSession !== session) return;
+        if (inserting || openingPending || windowMode !== 'compact' || !window?.isVisible() || popupSession !== session) return;
         session.observe(current);
       } catch { /* Keep the original target; paste performs its own final validation. */ }
       finally { following = false; }

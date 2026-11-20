@@ -1,4 +1,5 @@
 import { classify } from '../shared/classify';
+import { shortcutProblem } from '../shared/shortcuts';
 import { LocalDictionary, type DictionaryData } from '../shared/local-dictionary';
 import { DEFAULT_SETTINGS, type ClipboardBridge, type ClipboardEntry, type Snapshot } from '../shared/types';
 
@@ -6,6 +7,7 @@ declare global { interface Window { pasteboard?: ClipboardBridge } }
 
 function createBrowserBridge(): ClipboardBridge {
   const key = 'pasteboard-plus-preview-v1';
+  const platform = /Mac/.test(navigator.platform) ? 'darwin' : 'win32';
   let dictionary: Promise<LocalDictionary> | undefined;
   async function getDictionary() {
     return dictionary ??= fetch('./vocabulary/typelingo.json.gz').then(async response => {
@@ -18,7 +20,7 @@ function createBrowserBridge(): ClipboardBridge {
       return new LocalDictionary(data);
     }).catch(() => { dictionary = undefined; throw new Error('本地词库加载失败，请重试或重新打开应用。'); });
   }
-  let state: Snapshot = { windowMode: 'compact', entries: [], categories: [], settings: { ...DEFAULT_SETTINGS }, hasApiKey: false, keyStorage: 'session', shortcutRegistered: false, warning: null };
+  let state: Snapshot = { windowMode: 'compact', entries: [], categories: [], settings: { ...DEFAULT_SETTINGS }, hasApiKey: false, keyStorage: 'session', shortcutRegistered: false, typingShortcutRegistered: false, warning: null };
   try {
     const saved = localStorage.getItem(key);
     if (saved) {
@@ -45,7 +47,7 @@ function createBrowserBridge(): ClipboardBridge {
     changed(); return true;
   };
   return {
-    isDesktop: false, platform: /Mac/.test(navigator.platform) ? 'darwin' : 'win32',
+    isDesktop: false, platform,
     getSnapshot: async () => structuredClone(state),
     onChange(callback) { callbacks.add(callback); return () => { callbacks.delete(callback); }; },
     async capture() {
@@ -80,6 +82,10 @@ function createBrowserBridge(): ClipboardBridge {
     async saveSettings(input) {
       const { apiKey, clearApiKey, ...settings } = input;
       if (apiKey || clearApiKey) throw new Error('API 密钥请在桌面版中配置。浏览器预览不会保存密钥或发送翻译请求。');
+      if (settings.shortcut !== state.settings.shortcut || settings.typingShortcut !== state.settings.typingShortcut) {
+        const problem = shortcutProblem(settings, platform);
+        if (problem) throw new Error(problem);
+      }
       state.settings = settings;
       changed();
     },

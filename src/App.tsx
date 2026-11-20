@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS, LANGUAGES, type ClipboardEntry, type ContentKind, typ
 
 const kindLabels: Record<ContentKind, string> = { text: '文本', image: '图片', url: '链接', path: '文件路径', code: '代码' };
 const kindIcons = { text: AlignLeft, image: ImageIcon, url: Globe2, path: FolderOpen, code: Code2 };
-const initial: Snapshot = { windowMode: 'compact', entries: [], categories: [], settings: DEFAULT_SETTINGS, hasApiKey: false, keyStorage: 'session', shortcutRegistered: false, warning: null };
+const initial: Snapshot = { windowMode: 'compact', entries: [], categories: [], settings: DEFAULT_SETTINGS, hasApiKey: false, keyStorage: 'session', shortcutRegistered: false, typingShortcutRegistered: false, warning: null };
 type Toast = { message: string; error?: boolean };
 
 function relativeTime(time: number) {
@@ -19,6 +19,27 @@ function relativeTime(time: number) {
 }
 function shortcutParts(shortcut: string) { return shortcut.replace('CommandOrControl', bridge.platform === 'darwin' ? '⌘' : 'Ctrl').replace('Control', 'Ctrl').replace('Super', 'Win').split('+'); }
 function Shortcut({ value, small = false }: { value: string; small?: boolean }) { return <span className={`shortcut ${small ? 'small' : ''}`}>{shortcutParts(value).map((part, i) => <kbd key={i}>{part}</kbd>)}</span>; }
+function ShortcutRecorder({ id, label, value, optional, onChange, onError }: {
+  id: string; label: string; value: string; optional?: boolean; onChange(value: string): void; onError(message: string): void;
+}) {
+  const [recording, setRecording] = useState(false);
+  function accept(value: string) { onChange(value); onError(''); setRecording(false); }
+  return <button id={id} aria-label={label} className={`shortcut-recorder ${recording ? 'recording' : ''}`}
+    onClick={() => setRecording(true)} onBlur={() => setRecording(false)} onKeyDown={event => {
+      if (!recording) return;
+      event.preventDefault(); event.stopPropagation();
+      if (event.key === 'Escape') { setRecording(false); return; }
+      if (optional && event.key === 'Backspace') { accept(''); return; }
+      if (['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) return;
+      const key = event.code.startsWith('Key') ? event.code.slice(3) : event.code.startsWith('Digit') ? event.code.slice(5) : event.code === 'Space' ? 'Space' : /^F\d+$/.test(event.code) ? event.code : '';
+      const modifiers = [event.ctrlKey || (event.metaKey && bridge.platform === 'darwin') ? 'CommandOrControl' : '', event.metaKey && bridge.platform !== 'darwin' ? 'Super' : '', event.altKey ? 'Alt' : '', event.shiftKey ? 'Shift' : ''].filter(Boolean);
+      if (!key || !modifiers.length) { onError('请选择修饰键加字母、数字、空格或功能键。'); return; }
+      accept([...modifiers, key].join('+'));
+    }}>
+    {value ? <Shortcut value={value} /> : <span>已停用</span>}
+    <span>{recording ? '请按下新的组合键…' : '点击修改'}<Keyboard size={16} /></span>
+  </button>;
+}
 function WindowHeader({ title, onBack, backLabel, search, onSearch, searchLabel, placeholder, inputRef, settings = false }: {
   title: string; onBack(): void; backLabel: string; search: string; onSearch(value: string): void; searchLabel: string; placeholder: string; inputRef?: Ref<HTMLInputElement>; settings?: boolean;
 }) {
@@ -64,7 +85,6 @@ function EntryCard({ entry, selected, layout, onSelect, onCopy, onPin, categoryN
 function SettingsModal({ snapshot, initialTab, onClose, onSaved }: { snapshot: Snapshot; initialTab: 'general' | 'ai'; onClose(): void; onSaved(message: string): void }) {
   const [tab, setTab] = useState(initialTab);
   const [input, setInput] = useState<SettingsInput>({ ...snapshot.settings });
-  const [recording, setRecording] = useState(false);
   const [customCapacity, setCustomCapacity] = useState(![0,50,100,300,500,1000,10000,100000].includes(snapshot.settings.historyLimit));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -77,21 +97,19 @@ function SettingsModal({ snapshot, initialTab, onClose, onSaved }: { snapshot: S
     finally { setSaving(false); }
   }
   return <div className="fluent-settings" role="dialog" aria-label="偏好设置" aria-modal="true">
-    <WindowHeader title="设置" onBack={onClose} backLabel="关闭弹窗" settings search={settingsSearch} searchLabel="搜索设置" placeholder="查找设置" onSearch={query => { setSettingsSearch(query); if (/ai|api|作答|翻译|语言|词库|模型|密钥|deepseek|openai/i.test(query)) setTab('ai'); else if (/快捷|历史|记录|图片|字体|粘贴|常规/i.test(query)) setTab('general'); }} />
+    <WindowHeader title="设置" onBack={onClose} backLabel="关闭弹窗" settings search={settingsSearch} searchLabel="搜索设置" placeholder="查找设置" onSearch={query => { setSettingsSearch(query); if (/ai|api|作答|翻译|语言|词库|模型|密钥|deepseek|openai/i.test(query)) setTab('ai'); else if (/快捷|逐字|输入|历史|记录|图片|字体|粘贴|常规/i.test(query)) setTab('general'); }} />
     <div className="fluent-settings-layout"><aside className="fluent-settings-nav"><div className="fluent-settings-profile"><img src="./icon.svg" alt="" /><div><strong>我的剪贴板</strong><span>PasteBoard Plus · 本机</span></div></div><button className={tab === 'general' ? 'active' : ''} onClick={() => { setTab('general'); setSettingsSearch(''); }}><Settings2 size={19} />常规与历史</button><button className={tab === 'ai' ? 'active' : ''} onClick={() => { setTab('ai'); setSettingsSearch(''); }}><Sparkles size={19} />翻译与词库</button><button onClick={onClose}><Clipboard size={19} />返回剪贴板</button><div className="fluent-settings-nav-footer"><ShieldCheck size={17} /><span>历史在本机保存<br />中英日本地词库已内置</span></div></aside><main className="fluent-settings-main"><div className="fluent-settings-page-title"><h1>{tab === 'general' ? '常规与历史' : '翻译与词库'}</h1><p>{tab === 'general' ? '自定义剪贴板的显示、快捷键和记录方式。' : '设置作答、自动翻译和离线词库。'}</p></div>
     <div className="settings-body">{tab === 'general' ? <>
       <div className="settings-section-title"><Keyboard size={18} /><div><h3>随时，唤起灵感</h3><p>在任何应用中，按下快捷键打开或收起剪贴板。</p></div></div>
-      <label className="field-label">全局唤出快捷键</label><button className={`shortcut-recorder ${recording ? 'recording' : ''}`} onClick={() => setRecording(true)} onBlur={() => setRecording(false)} onKeyDown={event => {
-        if (!recording) return;
-        event.preventDefault(); event.stopPropagation();
-        if (event.key === 'Escape') { setRecording(false); return; }
-        if (['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) return;
-        const key = event.code.startsWith('Key') ? event.code.slice(3) : event.code.startsWith('Digit') ? event.code.slice(5) : event.code === 'Space' ? 'Space' : /^F\d+$/.test(event.code) ? event.code : '';
-        const modifiers = [event.ctrlKey || (event.metaKey && bridge.platform === 'darwin') ? 'CommandOrControl' : '', event.metaKey && bridge.platform !== 'darwin' ? 'Super' : '', event.altKey ? 'Alt' : '', event.shiftKey ? 'Shift' : ''].filter(Boolean);
-        if (!key || !modifiers.length) { setError('请使用 Ctrl、Alt、Shift 或 Command 与字母 / 数字的组合。'); return; }
-        setInput({ ...input, shortcut: [...modifiers, key].join('+') }); setRecording(false); setError('');
-      }} aria-label="录制全局快捷键"><Shortcut value={input.shortcut} /><span>{recording ? '请按下新的组合键…' : '点击修改'}<Keyboard size={16} /></span></button>
+      <label className="field-label" htmlFor="popup-shortcut">全局唤出快捷键</label>
+      <ShortcutRecorder id="popup-shortcut" label="录制全局快捷键" value={input.shortcut} onError={setError} onChange={shortcut => setInput({ ...input, shortcut })} />
       <p className="field-help">Windows + V 由系统占用，建议使用 Ctrl + Shift + V。快捷键冲突时会提示更换。</p>
+      {bridge.platform === 'win32' && <>
+        <label className="field-label" htmlFor="typing-shortcut">逐字输入快捷键</label>
+        <ShortcutRecorder id="typing-shortcut" label="录制逐字输入快捷键" value={input.typingShortcut} optional onError={setError} onChange={typingShortcut => setInput({ ...input, typingShortcut })} />
+        <p className="field-help">点击目标输入框，按下并松开快捷键，即可输入剪贴板文字。录制时按退格键可停用。</p>
+        {bridge.isDesktop && input.typingShortcut && input.typingShortcut === snapshot.settings.typingShortcut && !snapshot.typingShortcutRegistered && <p className="form-error" role="status">逐字输入快捷键未能注册，请更换组合。</p>}
+      </>}
       {!bridge.isDesktop && <div className="inline-note"><Globe2 size={16} /> 浏览器预览不注册系统快捷键；桌面版支持全局唤出和自动记录。</div>}
       <div className="field-row"><div><label htmlFor="history-limit" className="field-label">历史记录容量</label><p className="field-help">默认无限条；自定义为 0 表示不限制。有限容量下会保留置顶。</p></div><div className="capacity-controls"><select id="history-limit" value={customCapacity ? 'custom' : input.historyLimit} onChange={event => { const custom = event.target.value === 'custom'; setCustomCapacity(custom); if (!custom) setInput({ ...input, historyLimit: Number(event.target.value) }); }}>{[0,50,100,300,500,1000,10000,100000].map(n => <option key={n} value={n}>{n === 0 ? '无限制（默认）' : `${n} 条`}</option>)}<option value="custom">自定义</option></select>{customCapacity && <input type="number" min="0" step="1" aria-label="自定义历史条数" value={input.historyLimit} onChange={event => setInput({ ...input, historyLimit: Number(event.target.value) })} />}</div></div>
       <div className="field-row"><div><label className="field-label" htmlFor="capture-enabled">自动记录剪贴板</label><p className="field-help">只在本机保存；被来源应用标记为敏感的内容会跳过。</p></div><button id="capture-enabled" role="switch" aria-checked={input.captureEnabled} className={`toggle ${input.captureEnabled ? 'on' : ''}`} onClick={() => setInput({ ...input, captureEnabled: !input.captureEnabled })}><span /></button></div>

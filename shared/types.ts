@@ -33,6 +33,7 @@ export interface ClipboardEntry {
 export interface Category { id: string; name: string; color: string }
 export interface Settings {
   shortcut: string;
+  typingShortcut: string;
   historyLimit: number;
   captureEnabled: boolean;
   captureImages: boolean;
@@ -54,6 +55,7 @@ export interface Snapshot {
   hasApiKey: boolean;
   keyStorage: 'secure' | 'session';
   shortcutRegistered: boolean;
+  typingShortcutRegistered: boolean;
   warning: string | null;
   clipboardAi?: { state: 'working' } | { state: 'ready'; entryId: string; clipboardUpdated: boolean } | { state: 'error'; message: string };
   insertion?: { supported: boolean; hasTarget: boolean; caretLocated: boolean; message: string | null };
@@ -81,7 +83,7 @@ export interface ClipboardBridge {
   loadExamples?(): Promise<void>;
 }
 export const DEFAULT_SETTINGS: Settings = {
-  shortcut: 'CommandOrControl+Shift+V', historyLimit: 0, captureEnabled: true, captureImages: false,
+  shortcut: 'CommandOrControl+Shift+V', typingShortcut: 'CommandOrControl+Alt+V', historyLimit: 0, captureEnabled: true, captureImages: false,
   apiEndpoint: AI_PROVIDERS.openai.apiEndpoint, apiModel: AI_PROVIDERS.openai.apiModel, targetLanguage: 'zh-CN',
   sourceLanguage: 'auto', translationMode: 'auto', clipboardAiMode: 'off', fontSize: 16, autoPaste: true,
 };
