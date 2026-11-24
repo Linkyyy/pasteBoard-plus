@@ -15,6 +15,24 @@ describe('AI answers', () => {
     expect(messages[1]).toEqual({ role: 'user', content: '回答第一题和第三题。' });
   });
 
+  it('uses custom answer instructions and still produces plain text', async () => {
+    const customPrompt = '用英文回答。\n只给出最终结果。';
+    const request = vi.fn<TranslationFetch>().mockResolvedValue(response(200, { choices: [{ message: { content: '**Seven.**' } }] }));
+    await expect(answerText('3 加 4 等于多少？', { ...DEFAULT_SETTINGS, answerPrompt: customPrompt }, 'test-key', undefined, request))
+      .resolves.toBe('Seven.');
+    const { messages } = JSON.parse(request.mock.calls[0][1].body);
+    expect(messages[0]).toMatchObject({ role: 'system', content: expect.stringContaining(`${customPrompt}\n\nReturn the answer as plain text.`) });
+    expect(messages[0].content).not.toContain('Give the answer first');
+    expect(messages[1]).toEqual({ role: 'user', content: '3 加 4 等于多少？' });
+  });
+
+  it('uses the default instructions for a whitespace-only custom prompt', async () => {
+    const request = vi.fn<TranslationFetch>().mockResolvedValue(response(200, { choices: [{ message: { content: '7' } }] }));
+    await answerText('3 + 4?', DEFAULT_SETTINGS, 'test-key', undefined, request);
+    await answerText('3 + 4?', { ...DEFAULT_SETTINGS, answerPrompt: ' \n\t ' }, 'test-key', undefined, request);
+    expect(request.mock.calls[1][1].body).toBe(request.mock.calls[0][1].body);
+  });
+
   it('preserves plain text, link destinations, table values and literal fenced code', async () => {
     const plain = '已知 x * y = 6。计算 2*3*4 = 24。参见 https://example.org/?a=1&b=2。';
     const content = `${plain}\n\n| x | y |\n| --- | --- |\n| 2 | 3 |\n\n\`\`\`py\n# 乘法\nprint(2 * 3)\n\`\`\``;
@@ -27,7 +45,8 @@ describe('AI answers', () => {
 describe('AI translation', () => {
   it('sends only the selected text, model and target language to the configured provider', async () => {
     const request = vi.fn<TranslationFetch>().mockResolvedValue(response(200, { choices: [{ message: { content: '你好，世界。' }, finish_reason: 'stop' }] }));
-    const result = await translateText('Hello, world.', 'zh-CN', { ...DEFAULT_SETTINGS, apiEndpoint: 'https://example.org/v1/' }, 'test-key', request);
+    const answerPrompt = '只给出最终结果。';
+    const result = await translateText('Hello, world.', 'zh-CN', { ...DEFAULT_SETTINGS, answerPrompt, apiEndpoint: 'https://example.org/v1/' }, 'test-key', request);
     expect(result.text).toBe('你好，世界。'); expect(result.language).toBe('zh-CN');
     const [url, init] = request.mock.calls[0];
     expect(url).toBe('https://example.org/v1/chat/completions');
@@ -35,6 +54,7 @@ describe('AI translation', () => {
     const payload = JSON.parse(init.body);
     expect(payload.messages[1]).toEqual({ role: 'user', content: 'Hello, world.' });
     expect(payload.messages[0].content).toContain('简体中文');
+    expect(payload.messages[0].content).not.toContain(answerPrompt);
     expect(payload).not.toHaveProperty('history'); expect(init.redirect).toBe('error');
   });
   it.each([401,403,404,429,500])('reports HTTP %s without revealing provider bodies or secrets', async status => {

@@ -1,8 +1,8 @@
 {
-  "version": "0.1.9",
+  "version": "0.1.10",
   "repository": "https://github.com/Linkyyy/pasteBoard-plus",
-  "installerSize": "107.37 MiB",
+  "installerSize": "107.36 MiB",
   "portableSize": "135.96 MiB",
-  "installerSha256": "088d099e54da9bd3b7e8a73f81190c29b88cbd7246a2055fdf0142d3c13356c1",
-  "portableSha256": "6de3b374218894c99db0a636b8d363162b4c9df629da3ecaace5cb618d578df8"
+  "installerSha256": "10f55961910b44352574b8c63378a4d05054c89a1aee4584e1654bea3b8c6f82",
+  "portableSha256": "f55b4b329ebbe66c502d6068b46378364c05efe136417fbca2856f7f0743ebf3"
 }

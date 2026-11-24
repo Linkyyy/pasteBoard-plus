@@ -35,7 +35,6 @@ export default function AiSettings({ input, snapshot, onChange }: {
           onChange={event => onChange({ ...input, clipboardAiMode: event.target.value as ClipboardAiMode })}>
           {CLIPBOARD_AI_MODES.map(mode => <option key={mode} value={mode}>{AI_MODE_LABELS[mode]}</option>)}
         </select>
-        {input.clipboardAiMode === 'answer' && <p className="field-help">答案使用纯文本，简明覆盖问题要点。</p>}
       </div>
       <div>
         <label className="field-label" htmlFor="target-language">默认目标语言</label>
@@ -44,6 +43,13 @@ export default function AiSettings({ input, snapshot, onChange }: {
         </select>
       </div>
     </div>
+    {bridge.isDesktop && input.clipboardAiMode === 'answer' && <div>
+      <label className="field-label" htmlFor="answer-prompt">作答提示词</label>
+      <textarea id="answer-prompt" rows={3} value={input.answerPrompt} aria-describedby="answer-prompt-help"
+        placeholder="例如，先给出选项，再用一句话解释。"
+        onChange={event => onChange({ ...input, answerPrompt: event.target.value })} />
+      <p id="answer-prompt-help" className="field-help">留空使用默认提示词。答案以纯文本输出。</p>
+    </div>}
     <p className="field-help">{bridge.isDesktop ? '开启后，新复制的文字会发送给所选服务。原文和结果分别存入历史。' : '自动作答和自动翻译需要桌面版。'}</p>
     {status?.state === 'error' ? <div className="form-error" role="alert">{status.message}</div> : status && <div className="inline-note" role="status">
       {status.state === 'working' ? '正在处理新复制的文字…' : status.clipboardUpdated ? '结果已复制，可以直接粘贴' : '结果已保存，可从历史选择'}

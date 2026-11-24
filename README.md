@@ -2,13 +2,13 @@
 
 给每一次复制，一个好去处。一个类似 Windows + V 的桌面剪贴板，基于 Electron、React 和 TypeScript，主要面向 Windows，也可在 macOS / Linux 上开发运行。
 
-## 下载 v0.1.9
+## 下载 v0.1.10
 
-- Windows x64 安装版支持选择安装位置。[下载 EXE](installers/PasteBoard-Plus-Setup-0.1.9-x64.exe?raw=true)
-- 便携版完整解压后运行 `PasteBoard Plus.exe`。[下载 ZIP](installers/PasteBoard-Plus-0.1.9-win-x64.zip?raw=true)
+- Windows x64 安装版支持选择安装位置。[下载 EXE](installers/PasteBoard-Plus-Setup-0.1.10-x64.exe?raw=true)
+- 便携版完整解压后运行 `PasteBoard Plus.exe`。[下载 ZIP](installers/PasteBoard-Plus-0.1.10-win-x64.zip?raw=true)
 - 下载后可核对文件完整性。[SHA-256 校验文件](installers/SHA256SUMS.txt)
 
-v0.1.9 新增 Windows 逐字输入快捷键。复制文字或等 AI 答案就绪后，在目标输入框按下并松开 `Ctrl + Alt + V` 即可直接输入。AI 作答和自动翻译可在「设置 → 翻译与词库」开启，生成结果以普通记录加入历史。[项目官网](https://pasteboard-plus.vercel.app/)
+v0.1.10 支持自定义作答提示词。选择「作答」后可填写提示词，留空使用默认提示词。AI 作答和自动翻译可在「设置 → 翻译与词库」开启，生成结果以普通记录加入历史。[项目官网](https://pasteboard-plus.vercel.app/)
 
 安装包通过 Git LFS 存储。可通过上方链接直接获取，或在安装 Git LFS 后随仓库克隆。安装包未签名。Windows 测试覆盖光标定位、普通粘贴以及禁用粘贴时的逐字输入。
 
@@ -63,7 +63,7 @@ npm run dist:win     # Windows x64 安装程序 + 便携 ZIP
 npm run pack         # 当前平台的未压缩应用目录
 ```
 
-Windows 安装程序输出到 `release/PasteBoard-Plus-Setup-0.1.9-x64.exe`，可选择安装位置并创建桌面快捷方式。便携包输出到 `release/PasteBoard-Plus-0.1.9-win-x64.zip`。解压整个 ZIP 后运行 `PasteBoard Plus.exe`。Windows 输入辅助服务使用系统自带的 Windows PowerShell / .NET Framework，无需安装开发 SDK。v0.1.4 修正了自绘输入控件未暴露 Edit / ValuePattern 时误报“未找到原输入框”的判断；仅无法获取精确光标不再阻止粘贴。粘贴前仍检查原窗口、进程及焦点身份，目标改变时拒绝发送。
+Windows 安装程序输出到 `release/PasteBoard-Plus-Setup-0.1.10-x64.exe`，可选择安装位置并创建桌面快捷方式。便携包输出到 `release/PasteBoard-Plus-0.1.10-win-x64.zip`。解压整个 ZIP 后运行 `PasteBoard Plus.exe`。Windows 输入辅助服务使用系统自带的 Windows PowerShell / .NET Framework，无需安装开发 SDK。v0.1.4 修正了自绘输入控件未暴露 Edit / ValuePattern 时误报“未找到原输入框”的判断；仅无法获取精确光标不再阻止粘贴。粘贴前仍检查原窗口、进程及焦点身份，目标改变时拒绝发送。
 
 浏览器预览明确标注其模式：只能在点击「捕获剪贴板」时读取浏览器获准访问的文字，历史保存在此浏览器中。示例须手动载入；不会把示例加入桌面历史。系统全局快捷键、自动监听和 AI 请求由桌面版提供。
 
@@ -71,7 +71,7 @@ Windows 安装程序输出到 `release/PasteBoard-Plus-Setup-0.1.9-x64.exe`，�
 
 打开「设置 → 翻译与词库」，选择 OpenAI、DeepSeek 或自定义兼容接口。填写该服务的 API 密钥，选择「自动处理模式」并保存。预设会填入服务地址和模型名，均可编辑。更改为另一 API 地址时，需要为新服务填写密钥。
 
-- **作答**模式下复制问题，答案以纯文本保存到历史，先给结论，再补充必要说明。结果就绪后，按 `Ctrl + V`（macOS 用 `⌘ + V`）即可粘贴。
+- **作答**模式下复制问题，答案以纯文本保存到历史。默认先给结论，再补充必要说明。可填写「作答提示词」来调整回答，清空并保存即可恢复默认。结果就绪后，按 `Ctrl + V`（macOS 用 `⌘ + V`）即可粘贴。
 - **翻译**模式会将新复制的文字翻译为设定的目标语言。
 - **关闭**可停止自动处理。单条记录旁的手动翻译支持 AI 和 TypeLingo 词库。
 
@@ -158,7 +158,7 @@ tests/           单元测试和浏览器端到端测试
 
 界面依赖在构建时合并，不再随运行时重复携带完整的 React、图标库及 Zod 源码；发行包不含调试 source map。Chromium 只保留中英文资源，AI 翻译仍支持原有全部目标语言。安装包仍包含离线运行所需的 Electron / Chromium，没有改成需要联网下载主体的安装器。
 
-下载目录仅保留当前版本，旧版本可从 `v0.1.1` 至 `v0.1.8` 的标签获取。
+下载目录仅保留当前版本，旧版本可从 `v0.1.1` 至 `v0.1.9` 的标签获取。
 
 与 v0.1.1 的实测体积对比（v0.1.5 离线完整包，含本地词库）：
 

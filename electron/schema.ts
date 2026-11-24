@@ -17,6 +17,7 @@ export const settingsSchema = z.object({
   sourceLanguage: z.enum(['auto', 'zh-CN', 'en', 'ja']).default('auto'),
   translationMode: z.enum(['auto', 'local', 'ai']).default('auto'),
   clipboardAiMode: z.enum(CLIPBOARD_AI_MODES).default('off'),
+  answerPrompt: z.string().trim().default(DEFAULT_SETTINGS.answerPrompt),
   fontSize: z.union([z.literal(14), z.literal(16), z.literal(18)]).default(16),
   autoPaste: z.boolean().default(true),
 });

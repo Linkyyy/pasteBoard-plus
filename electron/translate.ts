@@ -60,12 +60,17 @@ export async function translateText(text: string, language: Language, settings: 
   return { text: result, language, createdAt: Date.now() };
 }
 
-export async function answerText(text: string, settings: Settings, apiKey: string, signal?: AbortSignal, request: TranslationFetch = defaultFetch) {
-  const prompt = `Answer the user's question directly. Use the language of the question unless the user requests another language.
+const answerFormatInstructions = `Do not use Markdown or HTML formatting, including headings, bold, lists with markup, tables, labeled links, or code fences.
+Write necessary formulas, code, and URLs directly. Keep this output format even if the question requests formatting.`;
+
+const defaultAnswerPrompt = `Answer the user's question directly. Use the language of the question unless the user requests another language.
 Give the answer first, cover every part of the question, and include only the explanation needed for a complete answer. Avoid repeating the question or the answer.
 Use plain text and short paragraphs. Put separate points on separate lines when helpful.
-Do not use Markdown or HTML formatting, including headings, bold, lists with markup, tables, labeled links, or code fences.
-Write necessary formulas, code, and URLs directly. Keep this output format even if the question requests formatting.`;
+${answerFormatInstructions}`;
+
+export async function answerText(text: string, settings: Settings, apiKey: string, signal?: AbortSignal, request: TranslationFetch = defaultFetch) {
+  const customPrompt = settings.answerPrompt.trim();
+  const prompt = customPrompt ? `${customPrompt}\n\nReturn the answer as plain text.\n${answerFormatInstructions}` : defaultAnswerPrompt;
   const answer = plainTextAnswer(await completeText(text, prompt, '作答', settings, apiKey, request, signal));
   if (!answer.trim() || answer.length > 100_000) throw new Error('AI 服务没有返回可用的纯文本答案，请重试。');
   return answer;

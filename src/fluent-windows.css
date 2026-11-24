@@ -16,6 +16,20 @@
 .fluent-window-controls .window-actions button:last-child:hover{color:white;background:#c42b1c}
 .fluent-preview-tag{align-self:center;padding-right:18px;font-size:11px;color:#666}
 .fluent-settings .settings-body{max-width:none;margin:0}
+.fluent-settings .settings-body textarea {
+  width: 100%;
+  padding: 8px 11px;
+  resize: vertical;
+  border: 0;
+  border-radius: 6px;
+  color: #333;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow: 0 1px 2px #00000015;
+}
+.fluent-settings .settings-body textarea::placeholder { color: #8a8a8a; }
+.fluent-settings .settings-body textarea:focus { outline: 1px solid #0067c0; }
 .fluent-settings-page-title{padding-bottom:23px}
 .fluent-settings-main{padding-top:20px}
 .fluent-settings button:focus-visible,.fluent-manager button:focus-visible,.fluent-manager summary:focus-visible{outline-color:#0067c0}

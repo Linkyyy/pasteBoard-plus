@@ -296,7 +296,8 @@ async function applySettings(settings: Settings, nextKey = apiKey, keyUpdate?: {
   const previous = store.settings;
   const aiChanged = previous.captureEnabled !== settings.captureEnabled || previous.clipboardAiMode !== settings.clipboardAiMode
     || apiBaseUrl(previous.apiEndpoint) !== apiBaseUrl(settings.apiEndpoint) || previous.apiModel !== settings.apiModel
-    || (settings.clipboardAiMode === 'translate' && previous.targetLanguage !== settings.targetLanguage) || nextKey !== apiKey;
+    || (settings.clipboardAiMode === 'translate' && previous.targetLanguage !== settings.targetLanguage)
+    || (settings.clipboardAiMode === 'answer' && previous.answerPrompt !== settings.answerPrompt) || nextKey !== apiKey;
   store.updateSettings(settings, keyUpdate);
   apiKey = nextKey;
   if (aiChanged) {

@@ -1,7 +1,7 @@
 {
   "name": "pasteboard-plus",
   "productName": "PasteBoard Plus",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Clipboard history with automatic AI answers and translations.",
   "author": "PasteBoard Plus",
   "license": "MIT",

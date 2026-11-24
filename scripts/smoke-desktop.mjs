@@ -10,6 +10,7 @@ const data = await mkdtemp(join(tmpdir(), 'pasteboard-desktop-'));
 const requests = [];
 const replies = new Map([
   ['What is 3 + 4?', '**3 + 4 = 7.**'],
+  ['Which settings apply to this reply?', 'Stale reply under the previous prompt.'],
   ['What is the old answer?', 'This response was superseded.'],
   ['What is the current answer?', 'This response is current.'],
   ['Good morning. See you tomorrow!', 'おはようございます。また明日！'],
@@ -269,6 +270,21 @@ try {
   await page.evaluate(() => window.pasteboard.setWindowMode('compact'));
   await page.evaluate(id => window.pasteboard.copy(id), answer.id);
 
+  const promptQuestion = 'Which settings apply to this reply?';
+  const releasePromptQuestion = holdReply(promptQuestion);
+  await writeText(promptQuestion);
+  await until(s => s.clipboardAi?.state === 'working' && requests.some(({ body }) => body.messages[1].content === promptQuestion), 'pending reply with default prompt');
+  const promptSettings = await openAiSettings(page);
+  const promptField = promptSettings.getByLabel('作答提示词', { exact: true });
+  assert.equal(await promptField.inputValue(), '');
+  const customPrompt = '请用英语作答。\n只给出一行结果。';
+  await promptField.fill(customPrompt);
+  await promptSettings.getByRole('button', { name: '保存设置', exact: true }).click();
+  await page.getByTestId('compact-board').waitFor();
+  await until(s => s.settings.answerPrompt === customPrompt && !s.clipboardAi, 'save custom prompt and cancel previous reply');
+  releasePromptQuestion();
+  assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), promptQuestion);
+
   const oldQuestion = 'What is the old answer?';
   const newQuestion = 'What is the current answer?';
   const releaseOld = holdReply(oldQuestion);
@@ -279,6 +295,9 @@ try {
   releaseOld();
   assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), replies.get(newQuestion));
   assert.equal((await state()).entries.some(entry => entry.content === replies.get(oldQuestion)), false);
+  assert.equal((await state()).entries.some(entry => entry.content === replies.get(promptQuestion)), false);
+  const customRequest = requests.find(({ body }) => body.messages[1].content === newQuestion);
+  assert(customRequest.body.messages[0].content.startsWith(customPrompt + '\n\n'));
 
   // New sensitive clipboard content must survive a reply already in flight.
   const pendingQuestion = 'What is the capital of Japan?';
@@ -304,8 +323,9 @@ try {
   assert.equal(await desktop.evaluate(({ clipboard }) => clipboard.readText()), replies.get(phrase));
   const translationRequest = requests.find(({ body }) => body.messages[1].content === phrase);
   assert.match(translationRequest.body.messages[0].content, /日语/);
+  assert.equal(translationRequest.body.messages[0].content.includes(customPrompt), false);
   assert.equal(requests.some(({ body }) => body.messages[1].content === sensitive), false);
-  assert.deepEqual(requests.slice(1).map(({ body }) => body.messages[1].content), [question, oldQuestion, newQuestion, pendingQuestion, phrase]);
+  assert.deepEqual(requests.slice(1).map(({ body }) => body.messages[1].content), [question, promptQuestion, oldQuestion, newQuestion, pendingQuestion, phrase]);
   await page.getByRole('button', { name: '译文', exact: true }).click();
   await page.getByTestId('compact-record').first().getByText(translated.entries[0].content, { exact: true }).waitFor();
   assert.equal(await page.getByText('AI 译文', { exact: true }).count(), 0);
@@ -323,8 +343,8 @@ try {
   await until(s => s.settings.clipboardAiMode === 'off', 'turn AI off');
   await writeText('Clipboard contents after disabling AI.');
   await until(s => s.entries[0]?.content === 'Clipboard contents after disabling AI.', 'normal capture after disabling AI');
-  assert.equal(requests.length, 7);
-  console.log('PASS AI mode and status live in settings, answers and translations use the restored history UI and system clipboard, latest copy wins');
+  assert.equal(requests.length, 8);
+  console.log('PASS default and custom answer prompts, cancellation on prompt changes, and independent translation and clipboard flows');
 
   await page.evaluate(async () => {
     const { settings } = await window.pasteboard.getSnapshot();
@@ -343,6 +363,7 @@ try {
   assert.equal(current.entries.find(entry => entry.id === answer.id).aiResult, 'answer');
   assert.equal(current.entries.find(entry => entry.id === translated.entries[0].id).aiResult, 'translate');
   assert.equal(current.settings.shortcut, 'CommandOrControl+Alt+P');
+  assert.equal(current.settings.answerPrompt, customPrompt);
   assert.equal(current.entries.find(entry => entry.id === image.id).image.width, 256);
   for (const id of largeImages) assert(current.entries.some(entry => entry.id === id), 'Large original images survive restart');
   if (current.keyStorage === 'session') assert.equal(current.hasApiKey, false);

@@ -43,6 +43,7 @@ export interface Settings {
   sourceLanguage: 'auto' | 'zh-CN' | 'en' | 'ja';
   translationMode: 'auto' | 'local' | 'ai';
   clipboardAiMode: ClipboardAiMode;
+  answerPrompt: string;
   fontSize: 14 | 16 | 18;
   autoPaste: boolean;
 }
@@ -85,5 +86,5 @@ export interface ClipboardBridge {
 export const DEFAULT_SETTINGS: Settings = {
   shortcut: 'CommandOrControl+Shift+V', typingShortcut: 'CommandOrControl+Alt+V', historyLimit: 0, captureEnabled: true, captureImages: false,
   apiEndpoint: AI_PROVIDERS.openai.apiEndpoint, apiModel: AI_PROVIDERS.openai.apiModel, targetLanguage: 'zh-CN',
-  sourceLanguage: 'auto', translationMode: 'auto', clipboardAiMode: 'off', fontSize: 16, autoPaste: true,
+  sourceLanguage: 'auto', translationMode: 'auto', clipboardAiMode: 'off', answerPrompt: '', fontSize: 16, autoPaste: true,
 };
